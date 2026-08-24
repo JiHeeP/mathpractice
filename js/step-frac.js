@@ -7,7 +7,8 @@ const FR = window.Frac;
 const {
   F, gcd, lcm, reduce, isReduced, eqExact, eqValue, recip,
   addRaw, subRaw, mulRaw, divRaw, toMixed, fromMixed, isImproper,
-  fracHTML, mixedHTML, fracText, mixedText, parseFrac
+  fracHTML, mixedHTML, fracText, mixedText, parseFrac,
+  josa, fracJosa, mixedJosa
 } = FR;
 
 const PAL = [
@@ -83,9 +84,9 @@ const stepAuto  = (desc, msg, fn)    => ({ type:'auto',  desc, msg, fn });
 function pushReduce(raw) {
   const g = gcd(raw.n, raw.d);
   const red = reduce(raw);
-  steps.push(stepYN('약분 확인', `${fracHTML(raw)} 을(를) 약분할 수 있나요?`, g > 1));
+  steps.push(stepYN('약분 확인', `${fracHTML(raw)}${fracJosa(raw, '을', '를')} 약분할 수 있나요?`, g > 1));
   if (g > 1) {
-    steps.push(stepNum('최대공약수 구하기', `${raw.n} 과(와) ${raw.d} 의 최대공약수는?`, g));
+    steps.push(stepNum('최대공약수 구하기', `${raw.n}${josa(raw.n, '과', '와')} ${raw.d}의 최대공약수는?`, g));
     steps.push(stepFrac('약분하기', `분자와 분모를 각각 ${g} 로 나누면?`, red, () => fill('reduce', fracHTML(red))));
   } else {
     steps.push(stepAuto('약분 확인', '더 이상 약분할 수 없어요 — 이미 기약분수!', () => fill('reduce', fracHTML(red))));
@@ -97,11 +98,11 @@ function pushReduce(raw) {
 function pushCommonDenom(A, B, sign) {
   const L = lcm(A.d, B.d);
   const x = A.n * (L / A.d), y = B.n * (L / B.d);
-  steps.push(stepNum('최소공배수 구하기', `분모 ${A.d} 와(과) ${B.d} 의 최소공배수는?`, L,
+  steps.push(stepNum('최소공배수 구하기', `분모 ${A.d}${josa(A.d, '과', '와')} ${B.d}의 최소공배수는?`, L,
     () => fill('common', `${slot('?', L)}<span class="q-op">${sign}</span>${slot('?', L)}`)));
-  steps.push(stepNum('통분하기 ①', `${fracHTML(A)} 을(를) 분모 ${L} 로 바꾸면 분자는?`, x,
+  steps.push(stepNum('통분하기 ①', `${fracHTML(A)}${fracJosa(A, '을', '를')} 분모 ${L}로 바꾸면 분자는?`, x,
     () => fill('common', `${fracHTML(F(x,L))}<span class="q-op">${sign}</span>${slot('?', L)}`)));
-  steps.push(stepNum('통분하기 ②', `${fracHTML(B)} 을(를) 분모 ${L} 로 바꾸면 분자는?`, y,
+  steps.push(stepNum('통분하기 ②', `${fracHTML(B)}${fracJosa(B, '을', '를')} 분모 ${L}로 바꾸면 분자는?`, y,
     () => fill('common', `${fracHTML(F(x,L))}<span class="q-op">${sign}</span>${fracHTML(F(y,L))}`)));
   return { L, x, y };
 }
@@ -142,12 +143,12 @@ function buildSteps() {
 
   /* ① 대분수 → 가분수 */
   if (isMixedLevel) {
-    steps.push(stepFrac('가분수로 고치기 ①', `${mixedHTML(p.A)} 을(를) 가분수로 고치면?`, p.A));
+    steps.push(stepFrac('가분수로 고치기 ①', `${mixedHTML(p.A)}${mixedJosa(p.A, '을', '를')} 가분수로 고치면?`, p.A));
     if (isImproper(p.B) || p.B.d === 1 || toMixed(p.B).w !== 0) {
-      steps.push(stepFrac('가분수로 고치기 ②', `${mixedHTML(p.B)} 을(를) 가분수로 고치면?`, p.B,
+      steps.push(stepFrac('가분수로 고치기 ②', `${mixedHTML(p.B)}${mixedJosa(p.B, '을', '를')} 가분수로 고치면?`, p.B,
         () => fill('improper', `${fracHTML(p.A)}<span class="q-op">${p.sign}</span>${fracHTML(p.B)}`)));
     } else {
-      steps.push(stepAuto('가분수로 고치기 ②', `${fracText(p.B)} 은(는) 이미 진분수예요. 그대로 두면 됩니다.`,
+      steps.push(stepAuto('가분수로 고치기 ②', `${fracText(p.B)}${fracJosa(p.B, '은', '는')} 이미 진분수예요. 그대로 두면 됩니다.`,
         () => fill('improper', `${fracHTML(p.A)}<span class="q-op">${p.sign}</span>${fracHTML(p.B)}`)));
     }
   }
@@ -157,7 +158,7 @@ function buildSteps() {
     /* ② 나눗셈이면 뒤집어서 곱셈으로 */
     if (isDiv) {
       const flipped = recip(B);
-      steps.push(stepFrac('나눗셈을 곱셈으로', `÷ 를 × 로 바꾸려면 ${fracHTML(B)} 을(를) 어떻게 바꿔야 하나요?`, flipped,
+      steps.push(stepFrac('나눗셈을 곱셈으로', `÷를 ×로 바꾸려면 ${fracHTML(B)}${fracJosa(B, '을', '를')} 어떻게 바꿔야 하나요?`, flipped,
         () => fill('flip', `${fracHTML(A)}<span class="q-op">×</span>${fracHTML(flipped)}`)));
       B = flipped;
     }
@@ -183,7 +184,7 @@ function buildSteps() {
   /* ④ 대분수로 되돌리기 */
   if (isMixedLevel) {
     rows.push('answer');
-    steps.push(stepMixed('대분수로 나타내기', `${fracHTML(red)} 을(를) 대분수로 고치면?`, red,
+    steps.push(stepMixed('대분수로 나타내기', `${fracHTML(red)}${fracJosa(red, '을', '를')} 대분수로 고치면?`, red,
       () => fill('answer', mixedHTML(red))));
   }
   prob.answer = red;

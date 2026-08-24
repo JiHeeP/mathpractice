@@ -1,6 +1,6 @@
 /* step-int.js — 정수 세로셈 엔진 (L1 두자리수×한자리수, L2 두자리수÷한자리수) */
 const StepInt = (() => {
-const { randInt } = window.Frac;
+const { randInt, josa } = window.Frac;
 const PAL = [
   { bg:'#fff7ed', bd:'#fed7aa', badge:'#ffedd5', tx:'#c2410c' },
   { bg:'#fef2f2', bd:'#fecaca', badge:'#fee2e2', tx:'#b91c1c' },
@@ -82,7 +82,7 @@ function buildMultSteps() {
   steps = [
     { desc:'일의 자리끼리 곱하기', q:`${p.aOnes} × ${p.b} = ?`, exp:p.onesProd,
       fn:() => fillDigits('ma', p.onesDigit, MULT_COLS - 1) },
-    { desc:'올림 수 구하기', q:`일의 자리에 ${p.onesDigit} 을(를) 쓰고, 십의 자리로 올리는 수는?`, exp:p.carry,
+    { desc:'올림 수 구하기', q:`일의 자리에 ${p.onesDigit}${josa(p.onesDigit, '을', '를')} 쓰고, 십의 자리로 올리는 수는?`, exp:p.carry,
       fn:() => showCarry(p.carry) },
     { desc:'십의 자리끼리 곱하기', q:`${p.aTens} × ${p.b} = ?`, exp:p.tensProd,
       fn:() => { if (p.carry === 0) fillDigits('ma', p.ans, MULT_COLS - 1); } }
@@ -138,10 +138,10 @@ function buildDivSteps() {
     current = current * 10 + digits[i];
     if (i > 0 && started) {
       const d = digits[i], cur = current;
-      steps.push({ type:'auto', desc:'다음 숫자 내리기', msg:`${d} 을(를) 내려서 ${cur}`, fn:() => {} });
+      steps.push({ type:'auto', desc:'다음 숫자 내리기', msg:`${d}${josa(d, '을', '를')} 내려서 ${cur}`, fn:() => {} });
     }
     const fits = current >= dv;
-    steps.push({ type:'yn', desc:'나눌 수 있는지 확인', q:`${current} 안에 ${dv} 이(가) 들어가나요?`, exp:fits, fn:() => {} });
+    steps.push({ type:'yn', desc:'나눌 수 있는지 확인', q:`${current} 안에 ${dv}${josa(dv, '이', '가')} 들어가나요?`, exp:fits, fn:() => {} });
 
     if (!fits) {
       if (started) {
@@ -158,7 +158,7 @@ function buildDivSteps() {
     const left = Math.max(0, rc - String(prod).length + 1);
     const rest = digits.slice(i + 1);
 
-    steps.push({ desc:'몫 구하기', q:`${current} 안에 ${dv} 이(가) 몇 번 들어가나요?`, exp:qd,
+    steps.push({ desc:'몫 구하기', q:`${current} 안에 ${dv}${josa(dv, '이', '가')} 몇 번 들어가나요?`, exp:qd,
       fn:() => fillDigits('dq', qd, col) });
     steps.push({ desc:'곱해서 확인', q:`${dv} × ${qd} = ?`, exp:prod,
       fn:() => { fillDigits(`ds${rnd}_`, prod, rc, 'dg-sub'); addSepLine(rnd, left, rc); } });

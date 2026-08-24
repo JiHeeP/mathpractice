@@ -4,6 +4,7 @@
 「수학 연산 마스터」를 **정적 웹앱 + Firebase Firestore** 로 옮긴 것입니다.
 
 - 빌드 도구 없음 — HTML/CSS/JS 파일을 그대로 Firebase Hosting에 올리면 끝
+- 외부 CDN 의존 없음 — Tailwind와 Chart.js를 `vendor/` 에 직접 담아 학교 네트워크에서도 안전
 - Firebase 설정 전에는 **로컬 모드**(localStorage)로 그대로 돌아가므로 바로 열어볼 수 있음
 
 ---
@@ -71,15 +72,26 @@
 ### 로컬에서 바로 보기 (Firebase 없이)
 
 ```bash
-npx http-server -p 8080 -c-1
-# http://127.0.0.1:8080 접속
+npm install
+npm start          # http://127.0.0.1:8080
 ```
 
 `js/firebase-config.js` 가 예시값 그대로면 **로컬 모드**로 동작합니다.
 예시 학생 3명이 자동으로 만들어지고 기록은 그 브라우저에만 저장됩니다.
-(`file://` 로 열어도 되지만, 로컬 서버로 여는 편이 안전합니다.)
 
-### Firebase에 올리기
+### 파일 하나로 묶어 나눠 주기 (서버·인터넷 없이)
+
+```bash
+node tools/build-single-file.js     # → dist/분수연산마스터.html
+```
+
+CSS와 JS를 전부 집어넣은 HTML 한 개가 나옵니다. 더블클릭하면 바로 열리므로
+USB로 나눠 주거나 인터넷이 안 되는 교실에서 쓰기 좋습니다.
+(이 파일은 항상 로컬 모드라 기록이 그 컴퓨터에만 남습니다.)
+
+### Firebase에 올리기 (진짜 '사이트'를 만드는 단계)
+
+배포하면 `https://<프로젝트이름>.web.app` 주소가 생깁니다. 그 전까지는 사이트 주소가 없습니다.
 
 1. [Firebase 콘솔](https://console.firebase.google.com)에서 프로젝트를 만들고
    **Firestore Database**를 (프로덕션 모드로) 켭니다.
@@ -157,6 +169,8 @@ students/2   { number: "2", name: "이영희", pinHash: "9f2c..." }
 ```
 index.html              모든 화면의 마크업
 css/app.css             분수 표기 · 풀이판 · 세로셈 격자 스타일
+vendor/tailwind.css     Tailwind 빌드 결과 (CDN 대신 직접 호스팅)
+vendor/chart.umd.js     Chart.js (성장 그래프)
 js/firebase-config.js   Firebase 설정 (직접 채우는 파일)
 js/fraction.js          분수 코어 (약분 · 사칙연산 · 대분수 변환 · 파싱)
 js/levels.js            레벨 정의 · 잠금 규칙 · 점수 계산
@@ -168,5 +182,6 @@ js/step-int.js          정수 세로셈 엔진 (곱셈 · 나눗셈)
 js/quiz.js              4지선다 엔진
 js/app.js               화면 전환 · 레벨 목록 · 교사 대시보드
 tools/pin-hash.html     PIN 해시 생성기
+tools/build-single-file.js  파일 하나로 묶는 스크립트
 firestore.rules         Firestore 보안 규칙
 ```

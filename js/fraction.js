@@ -92,6 +92,27 @@ function mixedText(f) {
   return `${m.w} ${m.n}/${m.d}`;
 }
 
+/* ── 한국어 조사 ──
+ * 숫자를 소리 내어 읽었을 때 받침이 있는지로 조사를 고른다.
+ * (영·일·삼·육·칠·팔 = 받침 있음 / 이·사·오·구 = 받침 없음)
+ * 분수는 "칠분의 이"처럼 분자를 마지막에 읽으므로 분자를 기준으로 삼는다.
+ */
+const JONGSEONG = { '0':true, '1':true, '2':false, '3':true, '4':false,
+                    '5':false, '6':true, '7':true, '8':true, '9':false };
+function hasJongseong(n) {
+  const s = String(Math.abs(Number(n)));
+  return !!JONGSEONG[s[s.length - 1]];
+}
+/** josa(8, '과', '와') → '과' */
+function josa(n, withJong, withoutJong) { return hasJongseong(n) ? withJong : withoutJong; }
+/** 분수 뒤에 붙는 조사 (분자 기준) */
+function fracJosa(f, withJong, withoutJong) { return josa(f.n, withJong, withoutJong); }
+/** 대분수로 보여 준 값 뒤에 붙는 조사 ("삼과 칠분의 이" → 분자 기준) */
+function mixedJosa(f, withJong, withoutJong) {
+  const m = toMixed(f);
+  return josa(m.n === 0 ? m.w : m.n, withJong, withoutJong);
+}
+
 /* ── 파싱 (학생 입력 "3/4", "1 2/3", "5") ── */
 function parseFrac(str) {
   const s = String(str || '').trim().replace(/\s+/g, ' ');
@@ -114,5 +135,6 @@ window.Frac = {
   F, reduce, isReduced, eqValue, eqExact,
   addRaw, subRaw, mulRaw, divRaw, add, sub, mul, div, recip,
   toMixed, fromMixed, isImproper, isWhole,
-  fracHTML, mixedHTML, fracText, mixedText, parseFrac
+  fracHTML, mixedHTML, fracText, mixedText, parseFrac,
+  hasJongseong, josa, fracJosa, mixedJosa
 };

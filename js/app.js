@@ -101,7 +101,7 @@ function submitStudentPin() {
 function backToStudents() {
   state.studentNo = null; state.studentName = '';
   only('studentSelection');
-  $('gameTitle').textContent = '수학 연산 마스터';
+  $('gameTitle').textContent = '분수 연산 마스터';
   const go = $('goToPinBtn');
   go.disabled = true; go.classList.replace('bg-orange-500','bg-gray-300');
 }

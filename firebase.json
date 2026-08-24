@@ -7,6 +7,9 @@
       "firestore.indexes.json",
       "**/.*",
       "**/node_modules/**",
+      "package*.json",
+      "tailwind.config.js",
+      "vendor/tailwind.src.css",
       "README.md"
     ]
   },

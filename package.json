@@ -1,0 +1,17 @@
+{
+  "name": "mathpractice",
+  "version": "1.0.0",
+  "description": "분수 연산 마스터 — 초등 분수 연산 연습 웹앱",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i vendor/tailwind.src.css -o vendor/tailwind.css --minify",
+    "start": "http-server -p 8080 -c-1",
+    "deploy": "firebase deploy --only firestore:rules,hosting"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  },
+  "dependencies": {
+    "chart.js": "4.4.7"
+  }
+}
