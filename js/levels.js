@@ -76,18 +76,25 @@ const LEVEL_CONFIGS = {
          theme:{bg:'bg-fuchsia-50',border:'border-fuchsia-300',hbg:'hover:bg-fuchsia-100',lbl:'text-fuchsia-900',descCls:'text-fuchsia-700'} }
 };
 
-/* ═══ 잠금 ═══ */
+/* ═══ 잠금 ═══
+ * 이전 레벨에서 (만점 × UNLOCK_RATIO) 이상을 받아야 다음 레벨의 '도전 연습'이 열린다.
+ * 자유 연습은 언제나 열려 있다. 1.0 이면 만점을 요구하고, 예컨대 0.9 로 낮추면 완화된다.
+ */
+const UNLOCK_RATIO = 1.0;
+
+function unlockThreshold(level) { return LEVEL_MAX[level] * UNLOCK_RATIO; }
+
 function isLevelUnlocked(level, bestScores) {
   const idx = LEVEL_ORDER.indexOf(level);
   if (idx <= 0) return true;                       // L1은 항상 열림
   const prev = LEVEL_ORDER[idx - 1];
-  return (bestScores[prev] || 0) >= LEVEL_MAX[prev];
+  return (bestScores[prev] || 0) >= unlockThreshold(prev);
 }
 function getPrevLevelInfo(level, bestScores) {
   const idx = LEVEL_ORDER.indexOf(level);
   if (idx <= 0) return null;
   const prev = LEVEL_ORDER[idx - 1];
-  return { level: prev, max: LEVEL_MAX[prev], best: bestScores[prev] || 0 };
+  return { level: prev, max: LEVEL_MAX[prev], need: unlockThreshold(prev), best: bestScores[prev] || 0 };
 }
 
 /* ═══ 점수 계산 ═══
@@ -126,6 +133,6 @@ function buildScoreOutcome(d) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES,
+  LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, UNLOCK_RATIO, unlockThreshold,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel
 };

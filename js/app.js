@@ -173,7 +173,8 @@ function selectLevel(lv) {
     btn.className = 'w-full py-5 bg-gray-100 border-2 border-gray-200 rounded-2xl text-left px-5 opacity-60 cursor-not-allowed';
     title.textContent = '🔒 도전 연습 (잠김)';
     title.className = 'text-lg font-black text-gray-400';
-    info.textContent = `${prev.level} 만점(${prev.max}점)에 도달해야 열려요 — 현재 ${prev.best}점`;
+    const goal = prev.need >= prev.max ? `만점(${prev.max}점)` : `${prev.need}점`;
+    info.textContent = `${prev.level} ${goal}에 도달해야 열려요 — 현재 ${prev.best}점`;
     info.className = 'text-sm text-gray-400 mt-1';
   }
 
