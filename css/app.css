@@ -1,0 +1,75 @@
+/* ══ 분수 표기 ══ */
+.fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 .25rem;line-height:1.1}
+.fr-n{padding:0 .35rem;border-bottom:2.5px solid currentColor}
+.fr-d{padding:0 .35rem}
+.fr-int,.fr-w{display:inline-block;vertical-align:middle;margin:0 .15rem}
+.fr-neg{vertical-align:middle;margin-right:.1rem}
+.q-op{display:inline-block;margin:0 .5rem;color:#6b7280;font-weight:800}
+
+/* ══ 풀이판 (분수 단계 엔진) ══ */
+.wb{display:flex;flex-direction:column;gap:.4rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:1rem;padding:.9rem 1rem}
+.wb-row{display:flex;align-items:center;gap:.75rem;min-height:2.9rem}
+.wb-label{flex:0 0 4.2rem;font-size:.75rem;font-weight:800;color:#9ca3af;text-align:right}
+.wb-body{flex:1;font-size:1.5rem;font-weight:800;color:#1f2937;display:flex;align-items:center;flex-wrap:wrap}
+.wb-body.wb-empty{color:#d1d5db;font-size:1.25rem}
+.wb-hint{font-size:1rem;color:#9ca3af;font-weight:700}
+.wb-filled{animation:pop .3s ease}
+@media(max-width:420px){.wb-body{font-size:1.25rem}.wb-label{flex-basis:3.4rem}}
+
+/* ══ 질문 · 입력 ══ */
+.step-q{font-size:1.5rem;font-weight:900;color:#1f2937;margin-bottom:1.1rem;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.15rem}
+@media(max-width:420px){.step-q{font-size:1.25rem}}
+.fi{display:flex;align-items:center;gap:.4rem}
+.fi-frac{display:flex;flex-direction:column;align-items:center;gap:.25rem}
+.fi-bar{width:3.6rem;height:3px;background:#374151;border-radius:2px}
+.fi-box{width:4.6rem;padding:.55rem;font-size:1.3rem;font-weight:800;text-align:center;font-family:'Courier New',monospace;border:2px solid #d1d5db;border-radius:.7rem}
+.fi-box:focus{outline:none;border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,.2)}
+.fi-box::placeholder{font-size:.8rem;color:#c7cbd1;font-weight:600}
+.btn-check{padding:.75rem 1.25rem;background:#6366f1;color:#fff;border-radius:.75rem;font-weight:800;transition:.15s;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.btn-check:hover{background:#4f46e5}.btn-check:active{transform:scale(.95)}
+.yn-btn{min-width:5rem;padding:.7rem 1.2rem;border-radius:.75rem;font-weight:800;font-size:1rem;transition:.15s;cursor:pointer;border:2px solid}
+.yn-btn:active{transform:scale(.95)}
+.yn-yes{background:#ecfdf5;color:#047857;border-color:#6ee7b7}.yn-yes:hover{background:#d1fae5}
+.yn-no{background:#fef2f2;color:#b91c1c;border-color:#fca5a5}.yn-no:hover{background:#fee2e2}
+
+/* ══ 4지선다 ══ */
+.quiz-q{font-size:2.5rem;font-weight:900;color:#1f2937;display:flex;align-items:center;justify-content:center;flex-wrap:wrap}
+@media(max-width:420px){.quiz-q{font-size:1.9rem}}
+.quiz-choice{padding:1rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:.85rem;font-size:1.6rem;font-weight:800;color:#374151;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;min-height:4.5rem}
+.quiz-choice:hover:not(:disabled){background:#f3f4f6}
+.quiz-choice:disabled{cursor:default}
+.qc-right{background:#dcfce7!important;border:2px solid #86efac!important;color:#15803d!important}
+.qc-wrong{background:#e5e7eb!important;color:#9ca3af!important}
+.qc-answer{background:#fef2f2!important;border:2px solid #ef4444!important;color:#b91c1c!important}
+
+/* ══ 레벨 배지 ══ */
+.lv-badge{margin-left:.4rem;display:inline-flex;align-items:center;border-radius:9999px;padding:.1rem .5rem;font-size:.7rem;font-weight:700;white-space:nowrap}
+
+/* ══ 곱셈 세로셈 격자 ══ */
+.cg-table{border-collapse:collapse;margin:0 auto}
+.cg-cell{width:3rem;height:3rem;border:1.5px solid #d1d5db;text-align:center;vertical-align:middle;font-size:1.5rem;font-weight:700;font-family:'Courier New',monospace;transition:.3s}
+@media(max-width:420px){.cg-cell{width:2.4rem;height:2.4rem;font-size:1.2rem}}
+.cg-given{color:#1f2937;background:#fef9c3}
+.cg-sign{color:#6b7280;background:#f9fafb;font-size:1.1rem}
+.cg-empty{background:#f9fafb}
+.cg-sep{border-bottom:3px solid #374151!important}
+.cg-ans{color:#ea580c}.cg-ans.cg-filled{background:#fff7ed}
+.cg-filled{animation:pop .3s ease}
+.cg-carry-row td{border:none!important;height:1.7rem;background:transparent!important}
+.carry-badge{display:inline-block;font-size:.8rem;font-weight:800;color:#dc2626;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:50%;width:1.5rem;height:1.5rem;line-height:1.4rem;text-align:center;animation:carryIn .4s ease}
+
+/* ══ 나눗셈 세로셈 격자 ══ */
+.dg-wrap{display:flex;justify-content:center;margin:1rem 0}
+.dg-table{border-collapse:collapse}
+.dg-cell{width:2.6rem;height:2.6rem;text-align:center;vertical-align:middle;font-size:1.35rem;font-weight:700;font-family:'Courier New',monospace;transition:.3s}
+@media(max-width:420px){.dg-cell{width:2.1rem;height:2.1rem;font-size:1.1rem}}
+.dg-dv{color:#4338ca}.dg-dd{color:#1f2937;background:#fefce8}
+.dg-bs{border-left:3px solid #374151}.dg-bt{border-top:3px solid #374151}
+.dg-q{color:#ea580c}.dg-q.cg-filled{background:#fff7ed}
+.dg-sub{color:#059669}.dg-sub.cg-filled{background:#ecfdf5}
+.dg-ssep{border-bottom:2.5px solid #374151!important}
+.dg-rem{color:#7c3aed}.dg-rem.cg-filled{background:#f5f3ff}
+.dg-mt{background:#f9fafb}
+
+@keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes carryIn{0%{transform:scale(0) translateY(8px);opacity:0}60%{transform:scale(1.3)}100%{transform:scale(1);opacity:1}}

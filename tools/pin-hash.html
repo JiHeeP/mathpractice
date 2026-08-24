@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PIN 해시 만들기</title>
+<style>
+ body{font-family:system-ui,sans-serif;max-width:34rem;margin:3rem auto;padding:0 1rem;color:#1f2937}
+ h1{font-size:1.4rem} p{color:#4b5563;line-height:1.6}
+ input{width:100%;padding:.7rem;font-size:1.1rem;border:2px solid #d1d5db;border-radius:.5rem;box-sizing:border-box}
+ code{display:block;margin-top:.8rem;padding:.8rem;background:#f3f4f6;border-radius:.5rem;word-break:break-all;font-size:.9rem}
+ .note{font-size:.85rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;padding:.8rem;border-radius:.5rem}
+</style>
+</head>
+<body>
+<h1>PIN 해시 만들기</h1>
+<p>학생 PIN이나 교사 PIN을 Firestore에 그대로 적지 않으려면, 여기서 만든 해시값을
+   <code style="display:inline;padding:.1rem .3rem">pinHash</code> /
+   <code style="display:inline;padding:.1rem .3rem">teacherPinHash</code> 필드에 붙여넣으세요.</p>
+<input id="pin" placeholder="PIN 입력 (예: 1234)" autocomplete="off"/>
+<code id="out">—</code>
+<p class="note">⚠️ 이 앱은 로그인(인증)을 쓰지 않습니다. 해시를 써도 짧은 숫자 PIN은
+   마음먹으면 알아낼 수 있어요. PIN은 '다른 학생 이름으로 잘못 들어가는 것'을 막는 용도로만 생각하세요.</p>
+<script>
+const out = document.getElementById('out');
+document.getElementById('pin').addEventListener('input', async e => {
+  const v = e.target.value.trim();
+  if (!v) { out.textContent = '—'; return; }
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('mathpractice::v1::' + v));
+  out.textContent = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+});
+</script>
+</body>
+</html>
