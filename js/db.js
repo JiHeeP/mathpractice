@@ -287,13 +287,26 @@ async function saveResult(code, payload) {
   return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
 }
 
+/** 점수로 인정할 수 있는 기록인지 판정하고 점수를 돌려준다.
+ *  도전인데 문제 수를 다 채우지 않은 기록(중도 포기)은 점수로 치지 않는다.
+ *  — 예전에 '그만하기'로 저장돼 버린 가짜 만점 기록도 여기서 걸러진다.
+ */
+function scoreOf(r) {
+  if (!r || r.score === null || r.score === undefined) return null;
+  const s = Number(r.score);
+  if (isNaN(s)) return null;
+  const cfg = Levels.LEVEL_CONFIGS[r.level];
+  if (r.mode === 'challenge' && cfg && typeof r.totalQuestions === 'number' && r.totalQuestions < cfg.chalQ) return null;
+  return s;
+}
+
 async function getBestScores(code, studentNo) {
   const rows = await loadResults(code);
   const best = {};
   rows.forEach(r => {
     if (String(r.studentNo) !== String(studentNo)) return;
-    const s = Number(r.score);
-    if (r.score === null || r.score === undefined || isNaN(s)) return;
+    const s = scoreOf(r);
+    if (s === null) return;
     if (!best[r.level] || s > best[r.level]) best[r.level] = s;
   });
   return best;
@@ -302,8 +315,8 @@ async function getBestScores(code, studentNo) {
 async function getHistory(code, studentNo) {
   const rows = await loadResults(code);
   return rows
-    .filter(r => String(r.studentNo) === String(studentNo) && r.score !== null && r.score !== undefined)
-    .map(r => ({ ts:r.ts, label:fmtTime(r.ts), score:Number(r.score), level:r.level }))
+    .filter(r => String(r.studentNo) === String(studentNo) && scoreOf(r) !== null)
+    .map(r => ({ ts:r.ts, label:fmtTime(r.ts), score:scoreOf(r), level:r.level }))
     .sort((a, b) => a.ts - b.ts);
 }
 
@@ -321,8 +334,8 @@ async function getRanking(code, limit) {
   students.forEach(s => names[String(s.number)] = s.name);
   const best = {};
   rows.forEach(r => {
-    const score = Number(r.score);
-    if (r.score === null || r.score === undefined || isNaN(score)) return;
+    const score = scoreOf(r);
+    if (score === null) return;
     const no = String(r.studentNo);
     const e = { studentNo:no, name:names[no] || `학생 ${no}`, level:r.level, score, ts:r.ts };
     if (!best[no] || compareEntries(e, best[no]) < 0) best[no] = e;
@@ -336,11 +349,12 @@ async function getComparison(code, date1Key, date2Key) {
   const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
   const byStudent = {};
   rows.forEach(r => {
-    if (r.score === null || r.score === undefined) return;
+    const sc = scoreOf(r);
+    if (sc === null) return;
     const dk = r.dateKey || dateKey(new Date(r.ts));
     if (dk !== date1Key && dk !== date2Key) return;
     const no = String(r.studentNo);
-    const e = { studentNo:no, level:r.level, score:Number(r.score), ts:r.ts };
+    const e = { studentNo:no, level:r.level, score:sc, ts:r.ts };
     byStudent[no] = byStudent[no] || {};
     if (!byStudent[no][dk] || compareEntries(e, byStudent[no][dk]) < 0) byStudent[no][dk] = e;
   });

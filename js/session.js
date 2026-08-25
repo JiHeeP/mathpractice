@@ -106,7 +106,7 @@ function buildPayload() {
   return {
     studentNo: App.studentNo,
     level: S.level,
-    mode: isChallenge() ? 'challenge' : 'free',
+    mode: !isChallenge() ? 'free' : (S.solved >= S.total ? 'challenge' : 'aborted'),
     totalQuestions: S.solved,
     correct: S.correct,
     incorrect: S.incorrect,
@@ -114,7 +114,9 @@ function buildPayload() {
     durationSec: dur,
     timeLimit: S.timeLimit,
     isOvertime: over,
-    resultStatus: !isChallenge() ? 'practice' : (over ? 'failed_overtime' : 'success')
+    resultStatus: !isChallenge() ? 'practice'
+                : S.solved < S.total ? 'aborted'
+                : (over ? 'failed_overtime' : 'success')
   };
 }
 
@@ -138,7 +140,8 @@ function showScore(r) {
 
 function exit() {
   stopTimer();
-  // 자유 연습도 '푼 기록'은 남긴다 (점수는 null 이라 랭킹·해금에 영향 없음)
+  // 자유 연습과 중도 포기한 도전도 '푼 기록'은 남긴다.
+  // 둘 다 점수가 null 이라 랭킹·해금에는 영향이 없다.
   if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(App.classCode, buildPayload()).catch(() => {}); }
   const area = document.getElementById('practiceArea');
   area.classList.add('hidden'); area.innerHTML = '';

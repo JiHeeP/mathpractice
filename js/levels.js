@@ -7,8 +7,8 @@ const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11',
 const LEVEL_MAX = {};
 LEVEL_ORDER.forEach((lv, i) => { LEVEL_MAX[lv] = 90 + i * 5; });
 
-/** 점수가 기록되지 않는 연습 모드 */
-const PRACTICE_MODES = ['free', 'step_free', 'free_choice'];
+/** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
+const PRACTICE_MODES = ['free', 'step_free', 'free_choice', 'aborted'];
 
 const GROUP_LABELS = {
   concept: '🎨 개념 이해',
