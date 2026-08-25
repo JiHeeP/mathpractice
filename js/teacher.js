@@ -110,7 +110,7 @@ function studentLink(no) {
 function copyLink() {
   const url = studentLink('');
   (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject())
-    .then(() => { $('tCopyMsg').textContent = '복사됨!'; setTimeout(() => $('tCopyMsg').textContent = '', 1500); })
+    .then(() => { $('tCopyMsg').textContent = '✅ 링크가 복사되었습니다 — 학급 게시판·메신저에 붙여넣어 공유하세요'; setTimeout(() => $('tCopyMsg').textContent = '', 3000); })
     .catch(() => { prompt('아래 주소를 복사하세요', url); });
 }
 
