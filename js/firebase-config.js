@@ -1,13 +1,11 @@
-/* firebase-config.js — Firebase 콘솔 > 프로젝트 설정 > 웹 앱에서 복사해 붙여넣으세요.
- * 값을 채우기 전까지는 localStorage(로컬 모드)로 동작합니다.
- */
+/* firebase-config.js — Firebase 웹 앱 설정 (공개되어도 되는 값입니다. 보안은 firestore.rules가 담당) */
 window.FIREBASE_CONFIG = {
-  apiKey:            'YOUR_API_KEY',
-  authDomain:        'YOUR_PROJECT.firebaseapp.com',
-  projectId:         'YOUR_PROJECT',
-  storageBucket:     'YOUR_PROJECT.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId:             'YOUR_APP_ID'
+  apiKey:            'AIzaSyD-0OnV9CfNbglUojNh1Sz-WpVzZImereY',
+  authDomain:        'mathpractice-1d8f9.firebaseapp.com',
+  projectId:         'mathpractice-1d8f9',
+  storageBucket:     'mathpractice-1d8f9.firebasestorage.app',
+  messagingSenderId: '536574163973',
+  appId:             '1:536574163973:web:836636baf0680e5146306c'
 };
 
 /* config/app 문서에 teacherPinHash 를 넣지 않았을 때 쓰는 기본 PIN */
