@@ -401,6 +401,43 @@ async function getAccessAlerts(code) {
   return alerts;
 }
 
+/* ═══ 기록 초기화 (담당 교사 전용) ═══
+ * 학생 명단은 그대로 두고 연습·도전 기록과 접속 로그만 지운다.
+ * 되돌릴 수 없으므로 호출하는 쪽에서 반드시 확인을 받아야 한다.
+ */
+async function clearRecords(code, onProgress) {
+  let removed = { results: 0, logs: 0, logsBlocked: false };
+  if (isLocal()) {
+    removed.results = LS.get(`cls.${code}.results`, []).length;
+    removed.logs = LS.get(`cls.${code}.logs`, []).length;
+    LS.set(`cls.${code}.results`, []);
+    LS.set(`cls.${code}.logs`, []);
+    invalidate();
+    return removed;
+  }
+  for (const col of ['results', 'logs']) {
+    try {
+      for (;;) {
+        const snap = await db.collection('classes').doc(code).collection(col).limit(300).get();
+        if (!snap.docs.length) break;
+        for (const d of snap.docs) {
+          await db.collection('classes').doc(code).collection(col).doc(d.id).delete();
+          removed[col]++;
+          if (onProgress) onProgress(removed);
+        }
+        if (snap.docs.length < 300) break;
+      }
+    } catch (e) {
+      // 접속 로그 삭제를 막아 둔 예전 보안 규칙에서는 여기로 온다.
+      // 점수와 무관하고 24시간 뒤 감시 대상에서 빠지므로 나머지는 계속 진행한다.
+      if (col === 'logs') removed.logsBlocked = true;
+      else throw e;
+    }
+  }
+  invalidate();
+  return removed;
+}
+
 /* ═══ 날짜 유틸 ═══ */
 function pad(n) { return String(n).padStart(2, '0'); }
 function dateKey(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -415,6 +452,6 @@ return {
   listClasses, createClass, renameClass, archiveClass, getClass,
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
-  saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts
+  saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
 };
 })();

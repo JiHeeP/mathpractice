@@ -183,6 +183,30 @@ function bulkImport() {
     .catch(e => note('tStudentsMessage', e.message));
 }
 
+/** 기록 전체 삭제 — 반 이름을 직접 입력해야 실행된다 */
+function clearRecords() {
+  const btn = $('tClearBtn'), msg = $('tClearMessage');
+  if (!confirm(`[${currentClass.name}] 의 모든 연습 기록과 점수를 삭제합니다.\n\n` +
+               '· 학생 명단은 남습니다\n· 랭킹과 성장 그래프가 비워집니다\n· 모든 레벨이 다시 잠깁니다\n\n되돌릴 수 없습니다. 계속할까요?')) return;
+  const typed = prompt(`확인을 위해 반 이름을 그대로 입력하세요:\n\n${currentClass.name}`);
+  if (typed === null) return;
+  if (typed.trim() !== currentClass.name) { note('tClearMessage', '반 이름이 일치하지 않아 취소했습니다.'); return; }
+
+  btn.disabled = true;
+  msg.className = 'min-h-6 mt-2 text-sm font-bold text-red-700';
+  msg.textContent = '삭제 중...';
+  DB.clearRecords(currentClass.code, p => { msg.textContent = `삭제 중... 기록 ${p.results}건 · 로그 ${p.logs}건`; })
+    .then(r => {
+      btn.disabled = false;
+      const tail = r.logsBlocked
+        ? ' (접속 로그는 보안 규칙에서 삭제가 막혀 있어 남아 있습니다 — 점수와는 무관합니다)'
+        : `, 접속 로그 ${r.logs}건`;
+      note('tClearMessage', `삭제 완료 — 연습 기록 ${r.results}건${tail}`, true);
+      loadStudents();
+    })
+    .catch(e => { btn.disabled = false; note('tClearMessage', '삭제 실패: ' + (e.message || '')); });
+}
+
 /* ═══ 대시보드 ═══ */
 function loadRanking() {
   DB.getRanking(currentClass.code)
@@ -304,6 +328,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, loadComparison, updateCompareHeaders, printCards
+  saveStudent, bulkImport, clearRecords, loadComparison, updateCompareHeaders, printCards
 };
 })();

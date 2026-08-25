@@ -81,11 +81,12 @@ service cloud.firestore {
         allow delete: if isOwner(code);
       }
 
-      // 접속 로그 — 추가만
+      // 접속 로그 — 추가만 가능, 지우는 것은 담당 교사만
       match /logs/{id} {
         allow read: if true;
         allow create: if validLog();
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if isOwner(code);
       }
     }
 

@@ -200,6 +200,15 @@
       <button class="w-full mt-2 py-2.5 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.bulkImport()">일괄 등록</button>
     </div>
     <div id="tStudentsMessage" class="min-h-6 mt-3 text-sm font-bold"></div>
+
+    <div class="mt-6 border-2 border-red-200 bg-red-50 rounded-2xl p-4">
+      <div class="font-black text-red-800 mb-1">⚠️ 기록 초기화</div>
+      <p class="text-sm text-red-700 mb-3">이 반 학생들의 <b>연습·도전 기록과 접속 로그를 모두 삭제</b>합니다.
+        점수·랭킹·성장 그래프가 사라지고 모든 레벨이 처음부터 다시 잠깁니다.
+        <b>학생 명단은 지워지지 않습니다.</b> 되돌릴 수 없습니다.</p>
+      <button id="tClearBtn" class="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition" onclick="Teacher.clearRecords()">기록 전체 삭제</button>
+      <div id="tClearMessage" class="min-h-6 mt-2 text-sm font-bold"></div>
+    </div>
   </div>
 
   <!-- 랭킹 -->
