@@ -102,12 +102,14 @@ const LEVEL_CONFIGS = {
 };
 
 /* ═══ 잠금 ═══
- * 이전 레벨에서 (만점 × UNLOCK_RATIO) 이상을 받아야 다음 레벨의 '도전 연습'이 열린다.
+ * 다음 레벨의 '도전 연습'을 열려면 이전 레벨에서 오답을 허용 개수 이하로 하고
+ * 시간 감점 없이(제한시간의 80% 이내) 완주해야 한다.
+ *   허용 오답: 문제가 10개 이하인 과정형 레벨은 1개, 나머지는 2개
  * 자유 연습은 언제나 열려 있다.
  */
-const UNLOCK_RATIO = 0.9;
+function allowedWrong(level) { return (LEVEL_CONFIGS[level].chalQ <= 10) ? 1 : 2; }
 
-function unlockThreshold(level) { return Math.round(LEVEL_MAX[level] * UNLOCK_RATIO * 10) / 10; }
+function unlockThreshold(level) { return LEVEL_MAX[level] - allowedWrong(level) * 2; }
 
 function isLevelUnlocked(level, bestScores) {
   const idx = LEVEL_ORDER.indexOf(level);
@@ -158,6 +160,6 @@ function buildScoreOutcome(d) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, UNLOCK_RATIO, unlockThreshold,
+  LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel
 };
