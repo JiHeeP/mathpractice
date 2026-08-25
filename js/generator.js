@@ -62,6 +62,7 @@ const NEAR_MIXED  = '값은 맞아요! 하지만 <b>대분수</b>로 나타낸 �
 /* ═══════════ L1 · L2 그림 개념 ═══════════ */
 
 function genPicFrac() {
+  if (Math.random() < 0.4) return genPicMixedFrac();   // 40%는 대분수 그림
   const kind = pick(['pie', 'bar', 'dots']);
   const d = kind === 'pie' ? randInt(2, 10) : kind === 'bar' ? randInt(2, 10) : pick([4, 6, 8, 9, 10, 12]);
   const n = randInt(1, d - 1);
@@ -77,7 +78,32 @@ function genPicFrac() {
   };
 }
 
+/** 대분수 그림 — 꽉 채운 도형 w개 + 일부만 색칠한 도형 1개 */
+function genPicMixedFrac() {
+  const kind = pick(['pie', 'bar']);
+  const d = randInt(2, 8), n = randInt(1, d - 1);
+  const w = randInt(1, kind === 'pie' ? 3 : 2);
+  const full = Pic[kind](d, d), part = Pic[kind](n, d);
+  const shapes = Array(w).fill(full).concat(part).join('');
+  const wrap = kind === 'bar' ? 'pic-col' : 'pic-multi';
+  const ans = fromMixed(w, n, d);                    // 그림 그대로의 대분수 (w와 n/d)
+  const cands = [
+    fracC(ans, false, NEAR_MIXED),                   // 가분수로 읽은 보기 (값은 같음)
+    mixC(fromMixed(w + 1, n, d), false),
+    w > 1 ? mixC(fromMixed(w - 1, n, d), false) : null,
+    n + 1 < d ? mixC(fromMixed(w, n + 1, d), false) : null,
+    n > 1 ? mixC(fromMixed(w, n - 1, d), false) : null,
+    mixC(fromMixed(w, d - n, d), false)              // 색칠 안 된 쪽을 센 보기
+  ].filter(Boolean).filter(c => !c.correct && c.key !== 'm' + mixedText(ans));
+  return {
+    display: `<div class="${wrap}">${shapes}</div><div class="pic-cap">색칠한 부분을 <b>대분수</b>로 나타내면?</div>`,
+    choices: finalize(mixC(ans, true), cands,
+      () => { const f = fromMixed(randInt(1, 4), randInt(1, d - 1), d); return eqValue(f, ans) ? null : mixC(f, false); })
+  };
+}
+
 function genPicDec() {
+  if (Math.random() < 0.4) return genPicMixedDec();    // 40%는 1을 넘는 소수 그림
   if (Math.random() < 0.5) {
     const k = randInt(1, 9);                          // 0.1 단위 막대
     const ans = textD(D(k, 1));
@@ -95,6 +121,39 @@ function genPicDec() {
   return {
     display: `<div class="pic-q">${Pic.hundredthsGrid(k)}</div><div class="pic-cap">색칠한 부분을 소수로 나타내면?</div>`,
     choices: finalize(decC(ans, true), cands, () => decC(textD(D(randInt(1, 99), 2)), false))
+  };
+}
+
+/** 1을 넘는 소수 그림 — 꽉 채운 그림 w개 + 일부만 색칠한 그림 1개 */
+function genPicMixedDec() {
+  if (Math.random() < 0.5) {
+    const w = randInt(1, 2), k = randInt(1, 9);        // 0.1 막대: w.k
+    const shapes = Array(w).fill(Pic.tenthsBar(10)).concat(Pic.tenthsBar(k)).join('');
+    const ans = textD(D(w * 10 + k, 1));
+    const cands = [
+      textD(D(k, 1)),                                  // 정수부 빠뜨림
+      textD(D(w * 10 + k, 2)),                         // 1.3 → 0.13
+      textD(D((w + 1) * 10 + k, 1)), w > 1 ? textD(D((w - 1) * 10 + k, 1)) : null,
+      textD(D(w * 10 + (k === 9 ? 8 : k + 1), 1))
+    ].filter(t => t && t !== ans).map(t => decC(t, false));
+    return {
+      display: `<div class="pic-col">${shapes}</div><div class="pic-cap">색칠한 부분을 소수로 나타내면?</div>`,
+      choices: finalize(decC(ans, true), cands, () => decC(textD(D(randInt(11, 39), 1)), false))
+    };
+  }
+  const w = randInt(1, 2), k = randInt(1, 99);         // 10×10 격자: w.kk
+  const shapes = Array(w).fill(Pic.hundredthsGrid(100)).concat(Pic.hundredthsGrid(k)).join('');
+  const ans = textD(D(w * 100 + k, 2));
+  const cands = [
+    textD(D(k, 2)),                                    // 정수부 빠뜨림
+    textD(D(w * 100 + k, 3)),                          // 소수점 위치 실수
+    textD(D((w + 1) * 100 + k, 2)),
+    textD(D(w * 100 + (k === 99 ? 98 : k + 1), 2)),
+    k % 10 !== 0 ? textD(D(w * 10 + Math.round(k / 10), 1)) : null
+  ].filter(t => t && t !== ans).map(t => decC(t, false));
+  return {
+    display: `<div class="pic-multi">${shapes}</div><div class="pic-cap">색칠한 부분을 소수로 나타내면?</div>`,
+    choices: finalize(decC(ans, true), cands, () => decC(textD(D(randInt(101, 299), 2)), false))
   };
 }
 

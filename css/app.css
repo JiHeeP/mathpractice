@@ -46,6 +46,10 @@
 .pic-q{display:flex;justify-content:center;margin-bottom:.9rem;flex-basis:100%}
 .pic-q svg{max-width:100%;height:auto}
 .pic-cap{font-size:1.15rem;font-weight:800;color:#374151;text-align:center;flex-basis:100%}
+.pic-multi{display:flex;justify-content:center;align-items:center;gap:.6rem;flex-wrap:wrap;flex-basis:100%;margin-bottom:.9rem}
+.pic-multi svg{max-width:30%;height:auto}
+.pic-col{display:flex;flex-direction:column;align-items:center;gap:.45rem;flex-basis:100%;margin-bottom:.9rem}
+.pic-col svg{max-width:100%;height:auto}
 .q-hint{font-size:1.1rem;color:#9ca3af;font-weight:700}
 .q-mid{font-size:1.3rem;color:#4b5563;font-weight:800;margin:0 .2rem}
 .qc-num{font-size:inherit;font-weight:inherit;font-variant-numeric:tabular-nums}
