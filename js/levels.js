@@ -1,88 +1,113 @@
-/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 */
+/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (22레벨: 분수·소수) */
 
-const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11','L12','L13','L14','L15'];
+const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11',
+                     'L12','L13','L14','L15','L16','L17','L18','L19','L20','L21','L22'];
 
-/** 레벨별 만점 (이전 레벨 만점 도달 시 다음 레벨 도전 해금) */
-const LEVEL_MAX = {
-  L1:90, L2:95, L3:100, L4:105, L5:110, L6:115, L7:120, L8:125,
-  L9:130, L10:135, L11:140, L12:145, L13:150, L14:155, L15:160
-};
+/** 레벨별 만점 — L1 90점부터 레벨당 +5 (L22 = 195) */
+const LEVEL_MAX = {};
+LEVEL_ORDER.forEach((lv, i) => { LEVEL_MAX[lv] = 90 + i * 5; });
 
 /** 점수가 기록되지 않는 연습 모드 */
 const PRACTICE_MODES = ['free', 'step_free', 'free_choice'];
 
 const GROUP_LABELS = {
-  int:    '✖️➗ 정수 곱셈·나눗셈',
-  same:   '🍕 분모가 같은 분수',
-  diff:   '🔗 분모가 다른 분수 (통분)',
-  muldiv: '⚡ 분수의 곱셈·나눗셈',
-  mixed:  '🎯 대분수'
+  concept: '🎨 개념 이해',
+  convert: '🔁 분수 · 소수 변환',
+  same:    '🍕 분모가 같은 분수',
+  common:  '🔗 최소공배수와 통분',
+  diff:    '➕➖ 분모가 다른 분수',
+  mixed:   '🎯 대분수',
+  dec:     '🔢 소수 계산'
 };
 
-/**
- * engine: 'int-mult' | 'int-div' | 'frac' | 'choice'
- * op    : frac 엔진의 연산 종류
- * chalQ / chalTime : 도전 모드 문제 수 / 제한시간(초)
+/* 제한시간 = 문제 수 × 유형별 단가(초)
+ *   개념 그림 12초 · 변환 15초 · 동분모 13초 · 통분 18초 · 소수 13~14초
+ *   과정형 50~80초 (피드백 대기 단축을 반영해 소폭 상향 완료)
  */
-const LEVEL_CONFIGS = {
-  L1:  { group:'int',    engine:'int-mult', type:'2x1',       chalQ:15, chalTime:450,
-         label:'두자리수 × 한자리수',  desc:'세로셈 — 일의 자리 올림을 한 단계씩',
-         theme:{bg:'bg-amber-50',  border:'border-amber-200',  hbg:'hover:bg-amber-100',  lbl:'text-amber-800',  descCls:'text-amber-600'} },
-  L2:  { group:'int',    engine:'int-div',  type:'2d1',       chalQ:10, chalTime:390,
-         label:'두자리수 ÷ 한자리수',  desc:'세로셈 — 나눗셈 과정을 한 단계씩',
-         theme:{bg:'bg-amber-50',  border:'border-amber-300',  hbg:'hover:bg-amber-100',  lbl:'text-amber-900',  descCls:'text-amber-700'} },
-  L3:  { group:'int',    engine:'choice',   type:'int-mixed', chalQ:20, chalTime:230,
-         label:'정수 곱셈·나눗셈 종합', desc:'4지선다로 빠르게 풀기',
-         theme:{bg:'bg-orange-50', border:'border-orange-200', hbg:'hover:bg-orange-100', lbl:'text-orange-800', descCls:'text-orange-600'} },
+const T = (q, per) => q * per;
 
-  L4:  { group:'same',   engine:'frac',     op:'same-add',    chalQ:12, chalTime:330,
+const LEVEL_CONFIGS = {
+  L1:  { group:'concept', engine:'choice', type:'pic-frac',   chalQ:20, chalTime:T(20,12),
+         label:'분수 개념 — 그림 보고 맞히기', desc:'색칠된 부분을 분수로 나타내기',
+         theme:{bg:'bg-rose-50',   border:'border-rose-200',   hbg:'hover:bg-rose-100',   lbl:'text-rose-800',   descCls:'text-rose-600'} },
+  L2:  { group:'concept', engine:'choice', type:'pic-dec',    chalQ:20, chalTime:T(20,12),
+         label:'소수 개념 — 그림 보고 맞히기', desc:'색칠된 부분을 소수로 나타내기',
+         theme:{bg:'bg-rose-50',   border:'border-rose-300',   hbg:'hover:bg-rose-100',   lbl:'text-rose-900',   descCls:'text-rose-700'} },
+
+  L3:  { group:'convert', engine:'choice', type:'to-mixed',   chalQ:20, chalTime:T(20,15),
+         label:'가분수 → 대분수', desc:'나누어 몫과 나머지로 바꾸기',
+         theme:{bg:'bg-amber-50',  border:'border-amber-200',  hbg:'hover:bg-amber-100',  lbl:'text-amber-800',  descCls:'text-amber-600'} },
+  L4:  { group:'convert', engine:'choice', type:'to-improper',chalQ:20, chalTime:T(20,15),
+         label:'대분수 → 가분수', desc:'정수 × 분모 + 분자',
+         theme:{bg:'bg-amber-50',  border:'border-amber-300',  hbg:'hover:bg-amber-100',  lbl:'text-amber-900',  descCls:'text-amber-700'} },
+  L5:  { group:'convert', engine:'choice', type:'frac-to-dec',chalQ:20, chalTime:T(20,15),
+         label:'분수 → 소수', desc:'소수점 아래 세 자리까지 · 대분수 포함',
+         theme:{bg:'bg-orange-50', border:'border-orange-200', hbg:'hover:bg-orange-100', lbl:'text-orange-800', descCls:'text-orange-600'} },
+  L6:  { group:'convert', engine:'choice', type:'dec-to-frac',chalQ:20, chalTime:T(20,15),
+         label:'소수 → 분수', desc:'기약분수로 나타내기 · 대분수 포함',
+         theme:{bg:'bg-orange-50', border:'border-orange-300', hbg:'hover:bg-orange-100', lbl:'text-orange-900', descCls:'text-orange-700'} },
+
+  L7:  { group:'same',    engine:'choice', type:'same-add',   chalQ:20, chalTime:T(20,13),
          label:'분모가 같은 분수의 덧셈', desc:'분자끼리 더하고 약분하기',
          theme:{bg:'bg-green-50',  border:'border-green-200',  hbg:'hover:bg-green-100',  lbl:'text-green-800',  descCls:'text-green-600'} },
-  L5:  { group:'same',   engine:'frac',     op:'same-sub',    chalQ:12, chalTime:330,
+  L8:  { group:'same',    engine:'choice', type:'same-sub',   chalQ:20, chalTime:T(20,13),
          label:'분모가 같은 분수의 뺄셈', desc:'분자끼리 빼고 약분하기',
          theme:{bg:'bg-green-50',  border:'border-green-300',  hbg:'hover:bg-green-100',  lbl:'text-green-900',  descCls:'text-green-700'} },
-  L6:  { group:'same',   engine:'choice',   type:'same-mixed',chalQ:20, chalTime:270,
-         label:'분모가 같은 분수 종합',   desc:'4지선다로 빠르게 풀기',
-         theme:{bg:'bg-emerald-50',border:'border-emerald-200',hbg:'hover:bg-emerald-100',lbl:'text-emerald-800',descCls:'text-emerald-600'} },
 
-  L7:  { group:'diff',   engine:'frac',     op:'diff-add',    chalQ:10, chalTime:480,
-         label:'분모가 다른 분수의 덧셈', desc:'최소공배수로 통분 → 더하기 → 약분',
+  L9:  { group:'common',  engine:'choice', type:'lcm',        chalQ:20, chalTime:T(20,15),
+         label:'최소공배수 구하기', desc:'통분의 준비 운동',
          theme:{bg:'bg-teal-50',   border:'border-teal-200',   hbg:'hover:bg-teal-100',   lbl:'text-teal-800',   descCls:'text-teal-600'} },
-  L8:  { group:'diff',   engine:'frac',     op:'diff-sub',    chalQ:10, chalTime:480,
-         label:'분모가 다른 분수의 뺄셈', desc:'최소공배수로 통분 → 빼기 → 약분',
+  L10: { group:'common',  engine:'choice', type:'common-denom',chalQ:20, chalTime:T(20,18),
+         label:'분수 통분하기', desc:'최소공배수를 공통분모로',
          theme:{bg:'bg-teal-50',   border:'border-teal-300',   hbg:'hover:bg-teal-100',   lbl:'text-teal-900',   descCls:'text-teal-700'} },
-  L9:  { group:'diff',   engine:'choice',   type:'diff-mixed',chalQ:20, chalTime:390,
-         label:'분모가 다른 분수 종합',   desc:'4지선다로 빠르게 풀기',
+
+  L11: { group:'diff',    engine:'frac',   op:'diff-add1',    chalQ:10, chalTime:T(10,54),
+         label:'분모가 다른 분수의 덧셈 (과정)', desc:'합이 1을 넘는 진분수 — 통분 → 계산 → 대분수',
          theme:{bg:'bg-cyan-50',   border:'border-cyan-200',   hbg:'hover:bg-cyan-100',   lbl:'text-cyan-800',   descCls:'text-cyan-600'} },
+  L12: { group:'diff',    engine:'choice', type:'diff-add1',  chalQ:20, chalTime:T(20,20),
+         label:'분모가 다른 분수의 덧셈', desc:'4지선다로 빠르게 풀기',
+         theme:{bg:'bg-cyan-50',   border:'border-cyan-300',   hbg:'hover:bg-cyan-100',   lbl:'text-cyan-900',   descCls:'text-cyan-700'} },
+  L13: { group:'diff',    engine:'frac',   op:'diff-sub',     chalQ:10, chalTime:T(10,50),
+         label:'분모가 다른 분수의 뺄셈 (과정)', desc:'통분 → 빼기 → 약분',
+         theme:{bg:'bg-sky-50',    border:'border-sky-200',    hbg:'hover:bg-sky-100',    lbl:'text-sky-800',    descCls:'text-sky-600'} },
+  L14: { group:'diff',    engine:'choice', type:'diff-sub',   chalQ:20, chalTime:T(20,19),
+         label:'분모가 다른 분수의 뺄셈', desc:'4지선다로 빠르게 풀기',
+         theme:{bg:'bg-sky-50',    border:'border-sky-300',    hbg:'hover:bg-sky-100',    lbl:'text-sky-900',    descCls:'text-sky-700'} },
 
-  L10: { group:'muldiv', engine:'frac',     op:'mul',         chalQ:12, chalTime:360,
-         label:'분수 × 분수',            desc:'분자끼리 · 분모끼리 곱하고 약분',
-         theme:{bg:'bg-blue-50',   border:'border-blue-200',   hbg:'hover:bg-blue-100',   lbl:'text-blue-800',   descCls:'text-blue-600'} },
-  L11: { group:'muldiv', engine:'frac',     op:'div',         chalQ:12, chalTime:390,
-         label:'분수 ÷ 분수',            desc:'뒤 분수를 뒤집어 곱셈으로 바꾸기',
-         theme:{bg:'bg-blue-50',   border:'border-blue-300',   hbg:'hover:bg-blue-100',   lbl:'text-blue-900',   descCls:'text-blue-700'} },
-  L12: { group:'muldiv', engine:'choice',   type:'muldiv',    chalQ:20, chalTime:360,
-         label:'분수 곱셈·나눗셈 종합',   desc:'4지선다로 빠르게 풀기',
+  L15: { group:'mixed',   engine:'frac',   op:'mixed-add',    chalQ:8,  chalTime:T(8,80),
+         label:'대분수의 덧셈 (과정)', desc:'가분수로 → 통분 → 계산 → 대분수',
          theme:{bg:'bg-indigo-50', border:'border-indigo-200', hbg:'hover:bg-indigo-100', lbl:'text-indigo-800', descCls:'text-indigo-600'} },
-
-  L13: { group:'mixed',  engine:'frac',     op:'convert',     chalQ:14, chalTime:300,
-         label:'가분수 ↔ 대분수',        desc:'나누어 몫과 나머지로 바꾸기',
+  L16: { group:'mixed',   engine:'choice', type:'mixed-add',  chalQ:15, chalTime:T(15,26),
+         label:'대분수의 덧셈', desc:'4지선다로 빠르게 풀기',
+         theme:{bg:'bg-indigo-50', border:'border-indigo-300', hbg:'hover:bg-indigo-100', lbl:'text-indigo-900', descCls:'text-indigo-700'} },
+  L17: { group:'mixed',   engine:'frac',   op:'mixed-sub',    chalQ:8,  chalTime:T(8,80),
+         label:'대분수의 뺄셈 (과정)', desc:'가분수로 → 통분 → 계산 → 대분수',
          theme:{bg:'bg-violet-50', border:'border-violet-200', hbg:'hover:bg-violet-100', lbl:'text-violet-800', descCls:'text-violet-600'} },
-  L14: { group:'mixed',  engine:'frac',     op:'mixed-addsub',chalQ:8,  chalTime:600,
-         label:'대분수의 덧셈·뺄셈',      desc:'가분수로 고쳐 통분 → 계산 → 대분수',
+  L18: { group:'mixed',   engine:'choice', type:'mixed-sub',  chalQ:15, chalTime:T(15,26),
+         label:'대분수의 뺄셈', desc:'4지선다로 빠르게 풀기',
          theme:{bg:'bg-violet-50', border:'border-violet-300', hbg:'hover:bg-violet-100', lbl:'text-violet-900', descCls:'text-violet-700'} },
-  L15: { group:'mixed',  engine:'frac',     op:'mixed-muldiv',chalQ:8,  chalTime:600,
-         label:'대분수의 곱셈·나눗셈',    desc:'가분수로 고쳐 계산 → 대분수로 되돌리기',
-         theme:{bg:'bg-fuchsia-50',border:'border-fuchsia-300',hbg:'hover:bg-fuchsia-100',lbl:'text-fuchsia-900',descCls:'text-fuchsia-700'} }
+
+  L19: { group:'dec',     engine:'choice', type:'dec-add',    chalQ:20, chalTime:T(20,13),
+         label:'소수의 덧셈', desc:'소수점 아래 두 자리까지 · 자릿수 같음',
+         theme:{bg:'bg-fuchsia-50',border:'border-fuchsia-200',hbg:'hover:bg-fuchsia-100',lbl:'text-fuchsia-800',descCls:'text-fuchsia-600'} },
+  L20: { group:'dec',     engine:'choice', type:'dec-sub',    chalQ:20, chalTime:T(20,13),
+         label:'소수의 뺄셈', desc:'소수점 아래 두 자리까지 · 자릿수 같음',
+         theme:{bg:'bg-fuchsia-50',border:'border-fuchsia-300',hbg:'hover:bg-fuchsia-100',lbl:'text-fuchsia-900',descCls:'text-fuchsia-700'} },
+  L21: { group:'dec',     engine:'choice', type:'dec-add-mix',chalQ:20, chalTime:T(20,14),
+         label:'소수의 덧셈 (자릿수 다름)', desc:'소수점 자리를 맞춰 계산하기',
+         theme:{bg:'bg-pink-50',   border:'border-pink-200',   hbg:'hover:bg-pink-100',   lbl:'text-pink-800',   descCls:'text-pink-600'} },
+  L22: { group:'dec',     engine:'choice', type:'dec-sub-mix',chalQ:20, chalTime:T(20,14),
+         label:'소수의 뺄셈 (자릿수 다름)', desc:'소수점 자리를 맞춰 계산하기',
+         theme:{bg:'bg-pink-50',   border:'border-pink-300',   hbg:'hover:bg-pink-100',   lbl:'text-pink-900',   descCls:'text-pink-700'} }
 };
 
 /* ═══ 잠금 ═══
  * 이전 레벨에서 (만점 × UNLOCK_RATIO) 이상을 받아야 다음 레벨의 '도전 연습'이 열린다.
- * 자유 연습은 언제나 열려 있다. 1.0 이면 만점을 요구하고, 예컨대 0.9 로 낮추면 완화된다.
+ * 자유 연습은 언제나 열려 있다.
  */
-const UNLOCK_RATIO = 1.0;
+const UNLOCK_RATIO = 0.9;
 
-function unlockThreshold(level) { return LEVEL_MAX[level] * UNLOCK_RATIO; }
+function unlockThreshold(level) { return Math.round(LEVEL_MAX[level] * UNLOCK_RATIO * 10) / 10; }
 
 function isLevelUnlocked(level, bestScores) {
   const idx = LEVEL_ORDER.indexOf(level);
@@ -99,7 +124,7 @@ function getPrevLevelInfo(level, bestScores) {
 
 /* ═══ 점수 계산 ═══
  * 만점에서 오답 2점씩 차감. 제한시간의 80%를 넘기면 최대 10점까지 서서히 감점,
- * 제한시간을 초과하면 추가 감점.
+ * 제한시간을 초과하면 추가 감점. (4지선다 도전의 오답 +10초 페널티는 duration에 이미 반영됨)
  */
 function calculateScore(d) {
   if (PRACTICE_MODES.indexOf(d.mode) !== -1) return null;

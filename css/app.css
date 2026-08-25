@@ -42,34 +42,17 @@
 .qc-wrong{background:#e5e7eb!important;color:#9ca3af!important}
 .qc-answer{background:#fef2f2!important;border:2px solid #ef4444!important;color:#b91c1c!important}
 
+/* ══ 그림 문제 (L1·L2) ══ */
+.pic-q{display:flex;justify-content:center;margin-bottom:.9rem;flex-basis:100%}
+.pic-q svg{max-width:100%;height:auto}
+.pic-cap{font-size:1.15rem;font-weight:800;color:#374151;text-align:center;flex-basis:100%}
+.q-hint{font-size:1.1rem;color:#9ca3af;font-weight:700}
+.q-mid{font-size:1.3rem;color:#4b5563;font-weight:800;margin:0 .2rem}
+.qc-num{font-size:inherit;font-weight:inherit;font-variant-numeric:tabular-nums}
+.pair-sep{display:inline-block;margin:0 .55rem;font-size:1rem;color:#6b7280;font-weight:700}
+
 /* ══ 레벨 배지 ══ */
 .lv-badge{margin-left:.4rem;display:inline-flex;align-items:center;border-radius:9999px;padding:.1rem .5rem;font-size:.7rem;font-weight:700;white-space:nowrap}
-
-/* ══ 곱셈 세로셈 격자 ══ */
-.cg-table{border-collapse:collapse;margin:0 auto}
-.cg-cell{width:3rem;height:3rem;border:1.5px solid #d1d5db;text-align:center;vertical-align:middle;font-size:1.5rem;font-weight:700;font-family:'Courier New',monospace;transition:.3s}
-@media(max-width:420px){.cg-cell{width:2.4rem;height:2.4rem;font-size:1.2rem}}
-.cg-given{color:#1f2937;background:#fef9c3}
-.cg-sign{color:#6b7280;background:#f9fafb;font-size:1.1rem}
-.cg-empty{background:#f9fafb}
-.cg-sep{border-bottom:3px solid #374151!important}
-.cg-ans{color:#ea580c}.cg-ans.cg-filled{background:#fff7ed}
-.cg-filled{animation:pop .3s ease}
-.cg-carry-row td{border:none!important;height:1.7rem;background:transparent!important}
-.carry-badge{display:inline-block;font-size:.8rem;font-weight:800;color:#dc2626;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:50%;width:1.5rem;height:1.5rem;line-height:1.4rem;text-align:center;animation:carryIn .4s ease}
-
-/* ══ 나눗셈 세로셈 격자 ══ */
-.dg-wrap{display:flex;justify-content:center;margin:1rem 0}
-.dg-table{border-collapse:collapse}
-.dg-cell{width:2.6rem;height:2.6rem;text-align:center;vertical-align:middle;font-size:1.35rem;font-weight:700;font-family:'Courier New',monospace;transition:.3s}
-@media(max-width:420px){.dg-cell{width:2.1rem;height:2.1rem;font-size:1.1rem}}
-.dg-dv{color:#4338ca}.dg-dd{color:#1f2937;background:#fefce8}
-.dg-bs{border-left:3px solid #374151}.dg-bt{border-top:3px solid #374151}
-.dg-q{color:#ea580c}.dg-q.cg-filled{background:#fff7ed}
-.dg-sub{color:#059669}.dg-sub.cg-filled{background:#ecfdf5}
-.dg-ssep{border-bottom:2.5px solid #374151!important}
-.dg-rem{color:#7c3aed}.dg-rem.cg-filled{background:#f5f3ff}
-.dg-mt{background:#f9fafb}
 
 @keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
 @keyframes carryIn{0%{transform:scale(0) translateY(8px);opacity:0}60%{transform:scale(1.3)}100%{transform:scale(1);opacity:1}}

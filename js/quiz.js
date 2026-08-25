@@ -1,6 +1,9 @@
-/* quiz.js — 4지선다 엔진 (L3 · L6 · L9 · L12) */
+/* quiz.js — 4지선다 엔진
+ * 문제는 generator.js 가 만든 { display, choices:[{html, correct, near}] } 를 그대로 표시한다.
+ * 도전 모드에서 오답을 고르면 시간 페널티 +10초 (찍기 방지).
+ */
 const Quiz = (() => {
-const { eqExact, eqValue, fracHTML, fracText } = window.Frac;
+const WRONG_TIME_PENALTY = 10;                        // 초
 
 let level, cfg, queue, cur, waiting;
 
@@ -23,24 +26,21 @@ function render() {
     </div>`;
 }
 
-/** 문제를 한 번에 넉넉히 만들어 두고 꺼내 쓴다 */
 function refill() { queue = Gen.generateChoiceSet(level, 20); }
 
 function nextQuestion() {
   if (!queue.length) refill();
   cur = queue.shift();
   waiting = false;
-  const body = document.getElementById('quizBody');
-  body.innerHTML = `
-    <div class="text-center mb-6"><div class="quiz-q">${cur.display}<span class="q-op">=</span><span class="text-gray-300">?</span></div></div>
+  document.getElementById('quizBody').innerHTML = `
+    <div class="text-center mb-6"><div class="quiz-q">${cur.display}</div></div>
     <div id="quizChoices" class="grid grid-cols-2 gap-3"></div>
     <div id="quizFb" class="min-h-8 mt-4 text-center font-bold text-lg"></div>`;
-
   const grid = document.getElementById('quizChoices');
   cur.choices.forEach((c, i) => {
     const btn = document.createElement('button');
     btn.className = 'quiz-choice';
-    btn.innerHTML = cur.kind === 'frac' ? fracHTML(c) : `<span class="text-2xl font-black">${c}</span>`;
+    btn.innerHTML = c.html;
     btn.onclick = () => pick(i, btn);
     grid.appendChild(btn);
   });
@@ -50,9 +50,7 @@ function pick(i, btn) {
   if (waiting) return;
   waiting = true;
   const chosen = cur.choices[i];
-  const isFrac = cur.kind === 'frac';
-  const ok = isFrac ? eqExact(chosen, cur.answer) : chosen === cur.answer;
-  const nearMiss = !ok && isFrac && eqValue(chosen, cur.answer);
+  const ok = chosen.correct;
 
   document.querySelectorAll('.quiz-choice').forEach(b => b.disabled = true);
   const fb = document.getElementById('quizFb');
@@ -63,13 +61,16 @@ function pick(i, btn) {
   } else {
     btn.classList.add('qc-wrong');
     document.querySelectorAll('.quiz-choice').forEach((b, j) => {
-      const c = cur.choices[j];
-      const hit = isFrac ? eqExact(c, cur.answer) : c === cur.answer;
-      if (hit) b.classList.add('qc-answer');
+      if (cur.choices[j].correct) b.classList.add('qc-answer');
     });
-    fb.innerHTML = nearMiss
-      ? '<span class="text-amber-600">값은 맞아요! 하지만 <b>기약분수</b>를 골라야 해요 ❌</span>'
+    let msg = chosen.near
+      ? `<span class="text-amber-600">${chosen.near} ❌</span>`
       : '<span class="text-red-500">틀렸습니다 ❌</span>';
+    if (Session.isChallenge()) {
+      Session.penalize(WRONG_TIME_PENALTY);
+      msg += `<div class="text-xs text-red-400 mt-1">⏱ 시간 −${WRONG_TIME_PENALTY}초</div>`;
+    }
+    fb.innerHTML = msg;
   }
 
   const done = Session.problemDone(ok);
@@ -78,8 +79,11 @@ function pick(i, btn) {
       document.getElementById('quizBody').innerHTML = Session.finishHTML();
       Session.saveResult();
     } else nextQuestion();
-  }, ok ? 900 : (nearMiss ? 2200 : 1600));
+  }, ok ? 700 : (chosen.near ? 1800 : 1300));
 }
 
-return { init };
+/** 테스트 전용 — 현재 문제의 정답 보기 인덱스 */
+function debugCorrectIndex() { return cur ? cur.choices.findIndex(c => c.correct) : -1; }
+
+return { init, debugCorrectIndex };
 })();

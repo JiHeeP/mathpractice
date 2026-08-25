@@ -17,8 +17,8 @@ const fragment = process.argv.includes('--fragment');
 const CSS = ['vendor/tailwind.css', 'css/app.css'];
 const JS = [
   'vendor/chart.umd.js',
-  'js/fraction.js', 'js/levels.js', 'js/generator.js', 'js/db.js',
-  'js/session.js', 'js/step-frac.js', 'js/step-int.js', 'js/quiz.js', 'js/app.js'
+  'js/fraction.js', 'js/decimal.js', 'js/pictures.js', 'js/levels.js', 'js/generator.js',
+  'js/db.js', 'js/session.js', 'js/step-frac.js', 'js/quiz.js', 'js/app.js'
 ];
 
 const html = read('index.html');

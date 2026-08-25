@@ -57,6 +57,17 @@ function startTimer() {
 }
 function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } }
 
+/** 시간 페널티 — 시작 시각을 앞당겨 경과시간에 가산한다 (도전 모드 전용) */
+function penalize(sec) {
+  if (!isChallenge()) return;
+  S.startAt -= sec * 1000;
+  const el = document.getElementById('sessTimer');
+  if (el) {
+    el.classList.add('text-red-600');
+    setTimeout(() => { if (S.timeLimit - elapsed() >= 0) el.classList.remove('text-red-600'); }, 900);
+  }
+}
+
 /** 문제 1개 끝. 도전 모드에서 목표 문제 수를 채웠으면 true */
 function problemDone(ok) {
   S.solved++;
@@ -136,7 +147,7 @@ function exit() {
 
 window.Session = {
   state: S, start, isChallenge, elapsed,
-  headerHTML, updateSolved, startTimer, stopTimer,
+  headerHTML, updateSolved, startTimer, stopTimer, penalize,
   problemDone, finishHTML, saveResult, exit
 };
 })();

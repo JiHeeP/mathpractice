@@ -131,9 +131,9 @@ function buildSteps() {
   if (p.op === 'convert') return buildConvertSteps(p);
 
   const isMixedLevel = !!p.mixedInput;
-  const isDiv  = /div$/.test(p.op) || p.op === 'div';
-  const isMul  = /mul$/.test(p.op) || p.op === 'mul';
-  const isAdd  = /add$/.test(p.op);
+  const isDiv  = false;                      // 나눗셈 과정 레벨은 현재 커리큘럼에 없음
+  const isMul  = false;
+  const isAdd  = /-add/.test(p.op) || /^same-add/.test(p.op);
 
   rows = ['orig'];
   if (isMixedLevel) rows.push('improper');
@@ -181,11 +181,12 @@ function buildSteps() {
   /* ③ 약분 */
   const red = pushReduce(raw);
 
-  /* ④ 대분수로 되돌리기 */
-  if (isMixedLevel) {
+  /* ④ 대분수로 되돌리기 — 대분수 레벨이거나 답이 1을 넘으면 */
+  if (isMixedLevel || isImproper(red)) {
     rows.push('answer');
     steps.push(stepMixed('대분수로 나타내기', `${fracHTML(red)}${fracJosa(red, '을', '를')} 대분수로 고치면?`, red,
       () => fill('answer', mixedHTML(red))));
+    prob.answerIsMixed = true;
   }
   prob.answer = red;
 }
@@ -271,7 +272,7 @@ function showStep() {
       <div class="text-sm font-bold mb-1" style="color:${cl.tx}">${s.desc}</div>
       <div class="text-lg font-black text-gray-800">${s.msg}</div>
     </div>`;
-    setTimeout(() => { idx++; showStep(); }, 1500);
+    setTimeout(() => { idx++; showStep(); }, 900);
     return;
   }
 
@@ -344,13 +345,13 @@ function finishStep(ok, fb, s, note, isYN) {
   if (s.fn) s.fn();                                   // 맞든 틀리든 풀이판은 정답으로 진행
   if (ok) {
     fb.innerHTML = '<span class="text-green-600">정답! ⭕</span>';
-    setTimeout(() => { waiting = false; idx++; showStep(); }, 700);
+    setTimeout(() => { waiting = false; idx++; showStep(); }, 600);
   } else {
     probOK = false;
     const answer = isYN ? `<b>${s.exp ? '예' : '아니오'}</b>` : expectedHTML(s.type, s.exp);
     fb.innerHTML = `<span class="text-red-500">틀렸어요 ❌ 정답: ${answer}</span>` +
                    (note ? `<div class="text-sm text-amber-600 mt-1">${note}</div>` : '');
-    setTimeout(() => { waiting = false; idx++; showStep(); }, note ? 3000 : 2200);
+    setTimeout(() => { waiting = false; idx++; showStep(); }, note ? 1800 : 1200);
   }
 }
 
@@ -363,8 +364,7 @@ function onProbDone() {
     return;
   }
   const p = prob;
-  const ansHTML = p.mixedInput || (p.op === 'convert' && p.dir === 'toMixed')
-    ? mixedHTML(p.answer) : fracHTML(p.answer);
+  const ansHTML = p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
   document.getElementById('stepQArea').innerHTML = `
     <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 text-center">
       <div class="text-4xl mb-2">${probOK ? '🎉' : '💪'}</div>

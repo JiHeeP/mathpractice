@@ -186,9 +186,8 @@ function startPractice(mode) {
   const cfg = L.LEVEL_CONFIGS[state.level];
   only('practiceArea');
   const back = () => backToLevels();
-  if (cfg.engine === 'choice')      Quiz.init(state.level, mode, cfg, back);
-  else if (cfg.engine === 'frac')   StepFrac.init(state.level, mode, cfg, back);
-  else                              StepInt.init(state.level, mode, cfg, back);
+  if (cfg.engine === 'choice') Quiz.init(state.level, mode, cfg, back);
+  else                         StepFrac.init(state.level, mode, cfg, back);
 }
 
 function backToLevels() {
