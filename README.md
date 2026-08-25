@@ -1,6 +1,6 @@
 # 분수 연산 마스터
 
-초등 분수·소수 연산 연습 웹앱 (22레벨). Google Apps Script(스프레드시트 + `google.script.run`)로 만들었던
+초등 분수·소수 연산 연습 웹앱 (22레벨). 배포 주소: https://mathpractice-five.vercel.app/ Google Apps Script(스프레드시트 + `google.script.run`)로 만들었던
 「수학 연산 마스터」를 **정적 웹앱 + Firebase Firestore** 로 옮긴 것입니다.
 
 - 빌드 도구 없음 — HTML/CSS/JS 파일을 그대로 Firebase Hosting에 올리면 끝
