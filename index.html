@@ -13,22 +13,39 @@
 <div class="max-w-2xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
 <header class="bg-gradient-to-r from-orange-400 to-red-400 text-white text-center py-6 px-4 shadow-md">
   <h1 id="gameTitle" class="text-3xl font-black tracking-tight drop-shadow-md">분수 연산 마스터</h1>
+  <p id="classBadge" class="hidden mt-1 text-sm font-bold text-orange-100"></p>
 </header>
 <main class="p-6">
 
 <div id="localBanner" class="hidden mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
   <b>로컬 모드</b> — Firebase 설정이 없어 이 브라우저에만 기록이 저장됩니다.
-  <span class="text-xs text-amber-600">(js/firebase-config.js 를 채우면 Firestore에 저장됩니다)</span>
 </div>
 
-<!-- ══ 학생 선택 ══ -->
-<div id="studentSelection" class="text-center">
+<!-- ══ 0. 반 코드 입력 ══ -->
+<div id="classEntry" class="hidden text-center">
+  <h2 class="text-xl font-bold text-gray-800 mb-2">우리 반 코드를 입력하세요</h2>
+  <p class="text-sm text-gray-500 mb-4">선생님께 받은 6자리 코드 (QR을 찍으면 이 화면 없이 바로 들어가요)</p>
+  <div class="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+    <input id="classCodeInput" type="text" autocomplete="off" maxlength="6" placeholder="반 코드"
+      class="w-full px-4 py-3 rounded-xl border border-orange-300 text-center text-2xl tracking-[0.5em] font-black uppercase focus:outline-none focus:ring-2 focus:ring-orange-300"
+      onkeydown="if(event.key==='Enter')App.submitClassCode()"/>
+    <div id="classCodeMessage" class="h-6 mt-3 text-sm font-bold text-red-500"></div>
+    <button class="w-full mt-3 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition" onclick="App.submitClassCode()">들어가기</button>
+  </div>
+  <button class="mt-6 text-sm text-slate-500 underline hover:text-slate-700" onclick="Teacher.showLogin()">교사용 로그인</button>
+</div>
+
+<!-- ══ 1. 학생 선택 ══ -->
+<div id="studentSelection" class="hidden text-center">
   <h2 class="text-xl font-bold text-gray-800 mb-4">학생을 선택하세요</h2>
   <div id="studentButtons" class="grid grid-cols-4 sm:grid-cols-5 gap-2 my-4 max-h-60 overflow-y-auto p-1">
     <div class="col-span-full text-gray-500 py-4">학생 명단을 불러오는 중...</div>
   </div>
-  <button class="w-full sm:w-auto mt-2 px-6 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold border border-slate-300 hover:bg-slate-200 transition" onclick="App.openTeacherLogin()">교사 대시보드</button>
   <button id="goToPinBtn" disabled class="w-full sm:w-auto mt-4 px-8 py-3 bg-gray-300 text-white rounded-xl font-bold transition-all transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100" onclick="App.goToPin()">다음 단계로 👉</button>
+  <div class="mt-6 flex justify-center gap-4 text-sm">
+    <button class="text-slate-500 underline hover:text-slate-700" onclick="App.leaveClass()">다른 반으로</button>
+    <button class="text-slate-500 underline hover:text-slate-700" onclick="Teacher.showLogin()">교사용 로그인</button>
+  </div>
 </div>
 
 <!-- ══ 학생 비밀번호 ══ -->
@@ -95,73 +112,142 @@
   </div>
 </div>
 
-<!-- ══ 교사 로그인 ══ -->
+<!-- ══ T1. 교사 로그인/가입 ══ -->
 <div id="teacherLogin" class="hidden text-center">
-  <h2 class="text-xl font-bold text-gray-800 mb-3">교사 대시보드</h2>
-  <p class="text-sm text-gray-500 mb-4">전체 랭킹은 PIN 입력 후 확인할 수 있습니다.</p>
-  <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-    <input id="teacherPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="교사 PIN 입력"
-      class="w-full px-4 py-3 rounded-xl border border-slate-300 text-center text-lg tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-slate-300"
-      onkeydown="if(event.key==='Enter')App.submitTeacherPin()"/>
-    <div id="teacherLoginMessage" class="h-6 mt-3 text-sm font-bold text-red-500"></div>
-    <button class="w-full mt-3 py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="App.submitTeacherPin()">전체 랭킹 보기</button>
+  <h2 id="tAuthTitle" class="text-xl font-bold text-gray-800 mb-3">교사 로그인</h2>
+  <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left">
+    <label class="block text-xs font-bold text-slate-500 mb-1">이메일</label>
+    <input id="tEmail" type="email" autocomplete="email" placeholder="teacher@example.com"
+      class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300"/>
+    <label class="block text-xs font-bold text-slate-500 mb-1 mt-3">비밀번호</label>
+    <input id="tPassword" type="password" autocomplete="current-password" placeholder="6자 이상"
+      class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300"
+      onkeydown="if(event.key==='Enter')Teacher.submitAuth()"/>
+    <div id="tAuthMessage" class="min-h-6 mt-3 text-sm font-bold text-red-500"></div>
+    <button id="tAuthBtn" class="w-full mt-2 py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.submitAuth()">로그인</button>
+    <div class="flex justify-between mt-4 text-sm">
+      <button id="tAuthToggle" class="text-slate-500 underline hover:text-slate-700" onclick="Teacher.toggleMode()">처음이신가요? 가입하기</button>
+      <button class="text-slate-500 underline hover:text-slate-700" onclick="Teacher.resetPassword()">비밀번호 재설정</button>
+    </div>
   </div>
-  <button class="w-full mt-4 py-3 bg-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-400 transition" onclick="App.closeTeacherLogin()">뒤로 가기</button>
+  <button class="w-full mt-4 py-3 bg-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-400 transition" onclick="Teacher.exitToStudent()">학생 화면으로</button>
 </div>
 
-<!-- ══ 교사 대시보드 ══ -->
-<div id="teacherDashboard" class="hidden">
-  <div class="bg-slate-50 border border-slate-200 rounded-3xl p-5">
-    <div class="flex items-center justify-between gap-3 mb-4">
-      <div><h2 class="text-xl font-black text-slate-800">교사 대시보드</h2><p class="text-sm text-slate-500">전체 기록 조회 화면</p></div>
-      <button id="teacherRefreshBtn" class="px-4 py-2 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="App.loadTeacherDashboard(true)">새로고침</button>
-      <button class="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-300 transition" onclick="App.closeTeacherDashboard()">닫기</button>
+<!-- ══ T2. 교사 홈 (반 목록) ══ -->
+<div id="teacherHome" class="hidden">
+  <div class="flex items-center justify-between mb-4">
+    <div><h2 class="text-xl font-black text-slate-800">내 반</h2><p id="tHomeEmail" class="text-xs text-slate-500"></p></div>
+    <button class="px-3 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-300 transition" onclick="Teacher.logout()">로그아웃</button>
+  </div>
+  <div id="tClassList" class="space-y-2 mb-5"><div class="text-center text-gray-500 py-4">불러오는 중...</div></div>
+  <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+    <label class="block text-xs font-bold text-slate-500 mb-1">새 반 만들기</label>
+    <div class="flex gap-2">
+      <input id="tNewClassName" type="text" maxlength="30" placeholder='예: 5학년 2반'
+        class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300"
+        onkeydown="if(event.key==='Enter')Teacher.createClass()"/>
+      <button class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="Teacher.createClass()">만들기</button>
     </div>
-    <div class="mb-4 flex flex-wrap gap-2">
-      <button id="tab-ranking" class="px-4 py-2 rounded-xl bg-slate-700 text-white font-bold transition relative" onclick="App.switchTeacherTab('ranking')">현재 랭킹</button>
-      <button id="tab-comparison" class="px-4 py-2 rounded-xl bg-white text-slate-600 font-bold border border-slate-300 transition relative" onclick="App.switchTeacherTab('comparison')">학생 비교</button>
-      <button id="tab-alerts" class="px-4 py-2 rounded-xl bg-white text-slate-600 font-bold border border-slate-300 transition relative" onclick="App.switchTeacherTab('alerts')">
-        접속 감시 <span id="alertBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-black">0</span>
-      </button>
-    </div>
+    <div id="tHomeMessage" class="min-h-5 mt-2 text-sm font-bold text-red-500"></div>
+  </div>
+</div>
 
-    <div id="panel-ranking" class="overflow-hidden rounded-xl border border-slate-300 bg-white">
+<!-- ══ T3. 반 관리 ══ -->
+<div id="teacherClass" class="hidden">
+  <div class="flex items-center justify-between gap-2 mb-1">
+    <h2 id="tClassName" class="text-xl font-black text-slate-800 truncate"></h2>
+    <button class="px-3 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-300 transition whitespace-nowrap" onclick="Teacher.backHome()">← 내 반</button>
+  </div>
+  <p class="text-sm text-slate-500 mb-3">반 코드 <b id="tClassCode" class="font-mono tracking-widest text-slate-700"></b>
+    <button class="ml-1 text-xs underline text-slate-400 hover:text-slate-600" onclick="Teacher.copyLink()">학생 링크 복사</button>
+    <span id="tCopyMsg" class="text-xs text-emerald-600 font-bold"></span></p>
+
+  <div class="mb-4 flex flex-wrap gap-2">
+    <button id="ttab-students" class="ttab ttab-on" onclick="Teacher.switchTab('students')">학생 관리</button>
+    <button id="ttab-ranking" class="ttab" onclick="Teacher.switchTab('ranking')">랭킹</button>
+    <button id="ttab-comparison" class="ttab" onclick="Teacher.switchTab('comparison')">학생 비교</button>
+    <button id="ttab-alerts" class="ttab relative" onclick="Teacher.switchTab('alerts')">접속 감시
+      <span id="alertBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-black">0</span></button>
+    <button id="ttab-cards" class="ttab" onclick="Teacher.switchTab('cards')">접속 카드</button>
+  </div>
+
+  <!-- 학생 관리 -->
+  <div id="tpanel-students">
+    <div class="overflow-hidden rounded-xl border border-slate-300 bg-white mb-4">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
+          <th class="px-3 py-2.5 text-center w-14">번호</th><th class="px-3 py-2.5">이름</th>
+          <th class="px-3 py-2.5 text-center">PIN</th><th class="px-3 py-2.5 text-right">관리</th></tr></thead>
+        <tbody id="tStudentRows"><tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
+      <label class="block text-xs font-bold text-slate-500 mb-2">학생 추가 / 수정 <span class="font-normal">(같은 번호면 덮어씀 · PIN 비우면 기존 유지)</span></label>
+      <div class="flex flex-wrap gap-2">
+        <input id="tStuNo" type="text" maxlength="4" placeholder="번호" class="w-20 px-3 py-2.5 rounded-xl border border-slate-300 text-center"/>
+        <input id="tStuName" type="text" maxlength="20" placeholder="이름" class="flex-1 min-w-[7rem] px-3 py-2.5 rounded-xl border border-slate-300"/>
+        <input id="tStuPin" type="text" maxlength="8" placeholder="PIN(선택)" class="w-28 px-3 py-2.5 rounded-xl border border-slate-300 text-center"
+          onkeydown="if(event.key==='Enter')Teacher.saveStudent()"/>
+        <button class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="Teacher.saveStudent()">저장</button>
+      </div>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+      <label class="block text-xs font-bold text-slate-500 mb-2">명단 한꺼번에 붙여넣기 — 한 줄에 <b>번호 이름 PIN</b> (PIN 생략 가능)</label>
+      <textarea id="tBulkText" rows="5" placeholder="1 김철수 0412&#10;2 이영희 1103&#10;3 박민수"
+        class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+      <button class="w-full mt-2 py-2.5 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.bulkImport()">일괄 등록</button>
+    </div>
+    <div id="tStudentsMessage" class="min-h-6 mt-3 text-sm font-bold"></div>
+  </div>
+
+  <!-- 랭킹 -->
+  <div id="tpanel-ranking" class="hidden">
+    <div class="overflow-hidden rounded-xl border border-slate-300 bg-white">
       <table class="w-full text-sm text-left text-gray-600">
         <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
           <th class="px-4 py-3 text-center w-16">순위</th><th class="px-4 py-3">이름</th>
           <th class="px-4 py-3 text-center">레벨</th><th class="px-4 py-3 text-right">점수</th></tr></thead>
-        <tbody id="teacherRankingBody"><tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+        <tbody id="tRankingBody"><tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
       </table>
     </div>
+  </div>
 
-    <div id="panel-comparison" class="hidden">
-      <div class="flex flex-wrap items-end gap-3 mb-3 p-3 bg-white rounded-xl border border-slate-200">
-        <div class="flex-1 min-w-[120px]">
-          <label class="block text-xs font-bold text-slate-500 mb-1">비교 기준일</label>
-          <input type="date" id="compareDate1" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300" onchange="App.updateCompareHeaders()"/>
-        </div>
-        <div class="text-slate-400 font-black pb-2">vs</div>
-        <div class="flex-1 min-w-[120px]">
-          <label class="block text-xs font-bold text-slate-500 mb-1">비교 대상일</label>
-          <input type="date" id="compareDate2" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300" onchange="App.updateCompareHeaders()"/>
-        </div>
-        <button class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition" onclick="App.loadComparison()">조회</button>
+  <!-- 학생 비교 -->
+  <div id="tpanel-comparison" class="hidden">
+    <div class="flex flex-wrap items-end gap-3 mb-3 p-3 bg-white rounded-xl border border-slate-200">
+      <div class="flex-1 min-w-[120px]">
+        <label class="block text-xs font-bold text-slate-500 mb-1">비교 기준일</label>
+        <input type="date" id="compareDate1" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-700" onchange="Teacher.updateCompareHeaders()"/>
       </div>
-      <div class="overflow-hidden rounded-xl border border-slate-300 bg-white">
-        <table class="w-full text-sm text-left text-gray-600">
-          <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
-            <th class="px-4 py-3 text-center w-16">번호</th><th class="px-4 py-3">이름</th>
-            <th class="px-4 py-3 text-right" id="compareHeader1">기준일 최고</th>
-            <th class="px-4 py-3 text-right" id="compareHeader2">대상일 최고</th>
-            <th class="px-4 py-3 text-right">점수 차이</th></tr></thead>
-          <tbody id="teacherComparisonBody"><tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">날짜를 선택하고 조회하세요</td></tr></tbody>
-        </table>
+      <div class="text-slate-400 font-black pb-2">vs</div>
+      <div class="flex-1 min-w-[120px]">
+        <label class="block text-xs font-bold text-slate-500 mb-1">비교 대상일</label>
+        <input type="date" id="compareDate2" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm font-bold text-slate-700" onchange="Teacher.updateCompareHeaders()"/>
       </div>
+      <button class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition" onclick="Teacher.loadComparison()">조회</button>
     </div>
+    <div class="overflow-hidden rounded-xl border border-slate-300 bg-white">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
+          <th class="px-4 py-3 text-center w-16">번호</th><th class="px-4 py-3">이름</th>
+          <th class="px-4 py-3 text-right" id="compareHeader1">기준일 최고</th>
+          <th class="px-4 py-3 text-right" id="compareHeader2">대상일 최고</th>
+          <th class="px-4 py-3 text-right">점수 차이</th></tr></thead>
+        <tbody id="tComparisonBody"><tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">날짜를 선택하고 조회하세요</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 
-    <div id="panel-alerts" class="hidden">
-      <div id="alertsContent" class="space-y-2"><div class="text-center text-sm text-gray-500 py-4">불러오는 중...</div></div>
-    </div>
+  <!-- 접속 감시 -->
+  <div id="tpanel-alerts" class="hidden">
+    <div id="alertsContent" class="space-y-2"><div class="text-center text-sm text-gray-500 py-4">불러오는 중...</div></div>
+  </div>
+
+  <!-- 접속 카드 -->
+  <div id="tpanel-cards" class="hidden text-center">
+    <p class="text-sm text-slate-500 mb-4">학생마다 QR과 개인 링크가 담긴 카드를 인쇄해 잘라 나눠 주세요.<br/>QR을 찍으면 반 코드 입력 없이 자기 이름 화면으로 바로 들어갑니다.</p>
+    <button class="px-6 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition" onclick="Teacher.printCards()">🖨️ 접속 카드 인쇄 화면 열기</button>
+    <div id="tCardsMessage" class="min-h-6 mt-3 text-sm font-bold text-red-500"></div>
   </div>
 </div>
 
@@ -169,8 +255,10 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="js/firebase-config.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="js/fraction.js"></script>
 <script src="js/decimal.js"></script>
 <script src="js/pictures.js"></script>
@@ -180,6 +268,7 @@
 <script src="js/session.js"></script>
 <script src="js/step-frac.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/teacher.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -121,7 +121,7 @@ function buildPayload() {
 /** 도전 완료 시 결과 저장 → 점수 표시 */
 function saveResult() {
   S.saved = true;
-  DB.saveResult(buildPayload())
+  DB.saveResult(App.classCode, buildPayload())
     .then(showScore)
     .catch(() => showScore({ displayScore: null, scoreRecorded: false, message: '점수 저장에 실패했습니다.', isError: true }));
 }
@@ -139,7 +139,7 @@ function showScore(r) {
 function exit() {
   stopTimer();
   // 자유 연습도 '푼 기록'은 남긴다 (점수는 null 이라 랭킹·해금에 영향 없음)
-  if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(buildPayload()).catch(() => {}); }
+  if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(App.classCode, buildPayload()).catch(() => {}); }
   const area = document.getElementById('practiceArea');
   area.classList.add('hidden'); area.innerHTML = '';
   if (S.onExit) S.onExit();

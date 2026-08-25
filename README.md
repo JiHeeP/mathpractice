@@ -107,12 +107,13 @@ firebase deploy --only firestore:rules,hosting
 
 ## 3. Firestore 데이터 구조
 
-| 컬렉션 | 문서 | 필드 |
-|---|---|---|
-| `students` | 학생 1명 | `number`(문자열), `name`, `pinHash`(선택) |
-| `results` | 연습 1회 | `studentNo`, `level`, `mode`, `correct`, `incorrect`, `accuracyPct`, `durationSec`, `timeLimit`, `isOvertime`, `resultStatus`, `score`, `ts`, `dateKey` |
-| `accessLogs` | 접속 1회 | `studentNo`, `ts`, `sessionId` |
-| `config` | `app` | `teacherPinHash`(선택) |
+| 컬렉션 | 내용 |
+|---|---|
+| `teachers/{uid}` | 교사 프로필 (Firebase 인증 계정과 1:1) |
+| `classes/{반코드}` | 반 — `teacherUid`, `name`, `archived` |
+| `classes/{반코드}/students/{번호}` | 학생 — `number`, `name`, `pinHash` |
+| `classes/{반코드}/results` | 연습·도전 기록 |
+| `classes/{반코드}/logs` | 접속 로그 |
 
 ### 학생 명단 넣기
 

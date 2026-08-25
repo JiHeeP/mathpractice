@@ -1,51 +1,63 @@
-/* db.js — 데이터 계층
- * Firebase(Firestore)가 설정되어 있으면 Firestore를, 아니면 브라우저 localStorage를 쓴다.
- * (localStorage 모드는 배포 전 로컬 테스트용)
+/* db.js — 데이터 계층 (반 단위 다중 교사 체계)
+ *
+ * Firestore 구조
+ *   teachers/{uid}                     : { email, createdAt }
+ *   classes/{code}                     : { teacherUid, name, createdAt, archived }
+ *   classes/{code}/students/{번호}     : { number, name, pinHash }
+ *   classes/{code}/results/{auto}      : 연습·도전 기록
+ *   classes/{code}/logs/{auto}         : 접속 로그
+ *
+ * Firebase 설정이 없으면 localStorage 로컬 모드로 동작한다.
+ * 로컬 모드에서는 로그인도 흉내만 내므로(uid 'local') 배포 전 개발·테스트 전용이다.
  */
 const DB = (() => {
-const COL = { students:'students', results:'results', logs:'accessLogs', config:'config' };
 const CACHE_MS = 60 * 1000;
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 헷갈리는 O/I/L/0/1 제외
 
-let db = null, mode = 'local';
-let cache = { results:null, resultsAt:0, students:null, studentsAt:0 };
+let db = null, fbAuth = null, mode = 'local';
+let cache = {};   // key → {at, data}
 
 /* ═══ 초기화 ═══ */
 function init() {
   const cfg = window.FIREBASE_CONFIG;
   const configured = cfg && cfg.projectId && !/YOUR_|xxxxx/i.test(JSON.stringify(cfg));
-  if (!configured || typeof firebase === 'undefined') {
-    mode = 'local';
-    seedLocal();
-    return mode;
-  }
+  if (!configured || typeof firebase === 'undefined') { mode = 'local'; seedLocal(); return mode; }
   try {
     firebase.initializeApp(cfg);
     db = firebase.firestore();
+    fbAuth = firebase.auth();
     mode = 'firestore';
   } catch (e) {
     console.warn('Firestore 초기화 실패 — 로컬 모드로 전환합니다.', e);
-    mode = 'local';
-    seedLocal();
+    mode = 'local'; seedLocal();
   }
   return mode;
 }
 const isLocal = () => mode === 'local';
-const invalidate = () => { cache.results = null; cache.students = null; };
+const invalidate = () => { cache = {}; };
+function cached(key, loader) {
+  const hit = cache[key];
+  if (hit && Date.now() - hit.at < CACHE_MS) return Promise.resolve(hit.data);
+  return Promise.resolve(loader()).then(data => { cache[key] = { at: Date.now(), data }; return data; });
+}
 
-/* ═══ localStorage 백업 저장소 ═══ */
+/* ═══ localStorage 저장소 ═══ */
 const LS = {
   get(k, d) { try { return JSON.parse(localStorage.getItem('mp.' + k)) ?? d; } catch (e) { return d; } },
-  set(k, v) { try { localStorage.setItem('mp.' + k, JSON.stringify(v)); } catch (e) {} }
+  set(k, v) { try { localStorage.setItem('mp.' + k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem('mp.' + k); } catch (e) {} }
 };
 function seedLocal() {
-  if (!LS.get('students')) {
-    LS.set('students', [
-      { number:'1', name:'예시학생1', pin:'' },
-      { number:'2', name:'예시학생2', pin:'' },
-      { number:'3', name:'예시학생3', pin:'' }
+  if (!LS.get('classes')) {
+    LS.set('classes', { LOCAL1: { teacherUid: 'local', name: '연습 반', createdAt: 0, archived: false } });
+    LS.set('cls.LOCAL1.students', [
+      { number:'1', name:'예시학생1', pinHash:'' },
+      { number:'2', name:'예시학생2', pinHash:'' },
+      { number:'3', name:'예시학생3', pinHash:'' }
     ]);
+    LS.set('cls.LOCAL1.results', []);
+    LS.set('cls.LOCAL1.logs', []);
   }
-  if (!LS.get('results')) LS.set('results', []);
 }
 
 /* ═══ PIN 해시 ═══ */
@@ -57,73 +69,216 @@ async function hashPin(pin) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-/* ═══ 학생 ═══ */
-async function getStudents() {
-  if (cache.students && Date.now() - cache.studentsAt < CACHE_MS) return cache.students;
-  let list;
-  if (isLocal()) {
-    list = LS.get('students', []);
-  } else {
-    const snap = await db.collection(COL.students).get();
-    list = snap.docs.map(d => ({ number: String(d.data().number ?? d.id), name: d.data().name || '', pin: d.data().pin || '', pinHash: d.data().pinHash || '' }));
+/* ═══ 교사 인증 ═══ */
+function authErrMsg(e) {
+  const c = e && e.code || '';
+  if (c.includes('invalid-email')) return '이메일 형식이 올바르지 않습니다.';
+  if (c.includes('email-already-in-use')) return '이미 가입된 이메일입니다. 로그인해 주세요.';
+  if (c.includes('weak-password')) return '비밀번호는 6자 이상이어야 합니다.';
+  if (c.includes('user-not-found') || c.includes('wrong-password') || c.includes('invalid-credential'))
+    return '이메일 또는 비밀번호가 올바르지 않습니다.';
+  if (c.includes('too-many-requests')) return '시도가 너무 많았습니다. 잠시 후 다시 해주세요.';
+  if (c.includes('network')) return '네트워크 오류입니다. 연결을 확인해 주세요.';
+  return '요청을 처리하지 못했습니다. (' + c + ')';
+}
+
+const auth = {
+  current() {
+    if (isLocal()) return LS.get('auth', null);
+    const u = fbAuth.currentUser;
+    return u ? { uid: u.uid, email: u.email } : null;
+  },
+  /** 로그인 상태가 정해지면 resolve (새로고침 시 세션 복원 대기) */
+  ready() {
+    if (isLocal()) return Promise.resolve(auth.current());
+    return new Promise(res => { const off = fbAuth.onAuthStateChanged(u => { off(); res(u ? { uid:u.uid, email:u.email } : null); }); });
+  },
+  async signUp(email, pw) {
+    if (isLocal()) { const u = { uid:'local', email }; LS.set('auth', u); return u; }
+    try {
+      const r = await fbAuth.createUserWithEmailAndPassword(email, pw);
+      await db.collection('teachers').doc(r.user.uid).set({ email, createdAt: Date.now() }, { merge: true });
+      return { uid: r.user.uid, email };
+    } catch (e) { throw new Error(authErrMsg(e)); }
+  },
+  async signIn(email, pw) {
+    if (isLocal()) { const u = { uid:'local', email }; LS.set('auth', u); return u; }
+    try { const r = await fbAuth.signInWithEmailAndPassword(email, pw); return { uid:r.user.uid, email }; }
+    catch (e) { throw new Error(authErrMsg(e)); }
+  },
+  async resetPassword(email) {
+    if (isLocal()) return;
+    try { await fbAuth.sendPasswordResetEmail(email); }
+    catch (e) { throw new Error(authErrMsg(e)); }
+  },
+  async signOut() {
+    if (isLocal()) { LS.del('auth'); return; }
+    await fbAuth.signOut();
   }
-  list.sort((a, b) => {
+};
+
+/* ═══ 반 관리 (교사) ═══ */
+function randomCode() {
+  let s = '';
+  const arr = new Uint32Array(6);
+  crypto.getRandomValues(arr);
+  for (let i = 0; i < 6; i++) s += CODE_ALPHABET[arr[i] % CODE_ALPHABET.length];
+  return s;
+}
+
+async function listClasses() {
+  const me = auth.current();
+  if (!me) return [];
+  if (isLocal()) {
+    const all = LS.get('classes', {});
+    return Object.entries(all).filter(([, c]) => c.teacherUid === me.uid && !c.archived)
+      .map(([code, c]) => ({ code, name: c.name }));
+  }
+  const snap = await db.collection('classes').where('teacherUid', '==', me.uid).get();
+  return snap.docs.filter(d => !d.data().archived).map(d => ({ code: d.id, name: d.data().name }));
+}
+
+async function createClass(name) {
+  const me = auth.current();
+  if (!me) throw new Error('로그인이 필요합니다.');
+  for (let t = 0; t < 8; t++) {
+    const code = randomCode();
+    if (isLocal()) {
+      const all = LS.get('classes', {});
+      if (all[code]) continue;
+      all[code] = { teacherUid: me.uid, name, createdAt: Date.now(), archived: false };
+      LS.set('classes', all);
+      LS.set(`cls.${code}.students`, []); LS.set(`cls.${code}.results`, []); LS.set(`cls.${code}.logs`, []);
+      invalidate(); return { code, name };
+    }
+    const ref = db.collection('classes').doc(code);
+    if ((await ref.get()).exists) continue;
+    await ref.set({ teacherUid: me.uid, name, createdAt: Date.now(), archived: false });
+    invalidate(); return { code, name };
+  }
+  throw new Error('반 코드를 만들지 못했습니다. 다시 시도해 주세요.');
+}
+
+async function renameClass(code, name) {
+  if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].name = name; LS.set('classes', all); } }
+  else await db.collection('classes').doc(code).update({ name });
+  invalidate();
+}
+
+async function archiveClass(code) {
+  if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].archived = true; LS.set('classes', all); } }
+  else await db.collection('classes').doc(code).update({ archived: true });
+  invalidate();
+}
+
+async function getClass(code) {
+  if (!code) return null;
+  return cached('class:' + code, async () => {
+    if (isLocal()) {
+      const c = (LS.get('classes', {}))[code];
+      return c && !c.archived ? { code, name: c.name, teacherUid: c.teacherUid } : null;
+    }
+    const doc = await db.collection('classes').doc(code).get();
+    if (!doc.exists || doc.data().archived) return null;
+    return { code, name: doc.data().name, teacherUid: doc.data().teacherUid };
+  });
+}
+
+/* ═══ 학생 명단 ═══ */
+function sortStudents(list) {
+  return list.sort((a, b) => {
     const an = Number(a.number), bn = Number(b.number);
     if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
     return String(a.number).localeCompare(String(b.number));
   });
-  cache.students = list; cache.studentsAt = Date.now();
-  return list;
 }
 
-async function verifyStudentPin(studentNo, pin) {
-  const s = (await getStudents()).find(x => String(x.number) === String(studentNo));
-  if (!s) return { ok:false, message:'학생을 찾을 수 없습니다.' };
-  const hasPin = !!(s.pinHash || s.pin);
-  if (!hasPin) { logAccess(studentNo); return { ok:true, noPinSet:true }; }     // 아직 PIN 미설정
-  const entered = String(pin || '').trim();
-  // 생일 PIN(월일 4자리)의 앞자리 0을 빼고 입력해도 통과하도록 두 형태 모두 확인
-  const candidates = [entered];
-  if (/^\d{1,3}$/.test(entered)) candidates.push(entered.padStart(4, '0'));
-  let ok = false;
-  for (const cand of candidates) {
-    if (s.pinHash ? (await hashPin(cand)) === s.pinHash : cand === String(s.pin).trim()) { ok = true; break; }
-  }
-  if (!ok) return { ok:false, message:'비밀번호가 틀렸어요. 다시 입력하세요.' };
-  logAccess(studentNo);
-  return { ok:true };
-}
-
-/* ═══ 접속 로그 ═══ */
-function logAccess(studentNo) {
-  const entry = { studentNo:String(studentNo), ts:Date.now(), sessionId:Math.random().toString(36).slice(2, 10) };
-  if (isLocal()) { const l = LS.get('logs', []); l.push(entry); LS.set('logs', l.slice(-500)); return Promise.resolve(); }
-  return db.collection(COL.logs).add(entry).catch(e => console.warn('접속 로그 실패', e));
-}
-
-/* ═══ 결과 ═══ */
-async function loadResults() {
-  if (cache.results && Date.now() - cache.resultsAt < CACHE_MS) return cache.results;
-  let rows;
-  if (isLocal()) rows = LS.get('results', []);
-  else {
-    const snap = await db.collection(COL.results).orderBy('ts', 'desc').limit(3000).get();
-    rows = snap.docs.map(d => d.data());
-  }
-  cache.results = rows; cache.resultsAt = Date.now();
-  return rows;
-}
-
-async function saveResult(payload) {
-  const outcome = Levels.buildScoreOutcome(payload);
-  const row = Object.assign({}, payload, {
-    score: outcome.recordedScore,
-    ts: Date.now(),
-    dateKey: dateKey(new Date())
+async function getStudents(code) {
+  return cached('students:' + code, async () => {
+    let list;
+    if (isLocal()) list = LS.get(`cls.${code}.students`, []);
+    else {
+      const snap = await db.collection('classes').doc(code).collection('students').get();
+      list = snap.docs.map(d => ({ number: String(d.data().number ?? d.id), name: d.data().name || '', pinHash: d.data().pinHash || '' }));
+    }
+    return sortStudents(list.slice());
   });
+}
+
+/** 추가/수정 — pin을 주면 새로 해시, 빈 값이면 기존 PIN 유지 */
+async function upsertStudent(code, { number, name, pin }) {
+  number = String(number).trim(); name = String(name).trim();
+  if (!number || !name) throw new Error('번호와 이름을 입력해 주세요.');
+  const existing = (await getStudents(code)).find(s => s.number === number);
+  const pinHash = (pin !== undefined && String(pin).trim() !== '')
+    ? await hashPin(String(pin).trim())
+    : (existing ? existing.pinHash : '');
+  const docData = { number, name, pinHash };
+  if (isLocal()) {
+    const list = LS.get(`cls.${code}.students`, []).filter(s => s.number !== number);
+    list.push(docData); LS.set(`cls.${code}.students`, list);
+  } else {
+    await db.collection('classes').doc(code).collection('students').doc(number).set(docData);
+  }
+  invalidate();
+}
+
+async function deleteStudent(code, number) {
+  if (isLocal()) {
+    LS.set(`cls.${code}.students`, LS.get(`cls.${code}.students`, []).filter(s => s.number !== String(number)));
+  } else {
+    await db.collection('classes').doc(code).collection('students').doc(String(number)).delete();
+  }
+  invalidate();
+}
+
+/** "번호 이름 PIN" 여러 줄 일괄 등록. PIN 생략 가능 */
+async function bulkImport(code, text) {
+  const rows = String(text).split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const p = l.split(/[\s,\t]+/);
+    return { number: p[0], name: p[1] || '', pin: p[2] || '' };
+  });
+  const bad = rows.find(r => !r.number || !r.name);
+  if (bad) throw new Error(`형식 오류: "${bad.number || ''} ${bad.name || ''}" — 각 줄은 "번호 이름 PIN(선택)" 입니다.`);
+  for (const r of rows) await upsertStudent(code, r);
+  return rows.length;
+}
+
+/* ═══ 학생 인증 · 접속 로그 ═══ */
+async function verifyStudentPin(code, studentNo, pin) {
+  const s = (await getStudents(code)).find(x => String(x.number) === String(studentNo));
+  if (!s) return { ok:false, message:'학생을 찾을 수 없습니다.' };
+  if (!s.pinHash) { logAccess(code, studentNo); return { ok:true, noPinSet:true }; }
+  const entered = String(pin || '').trim();
+  const candidates = [entered];
+  if (/^\d{1,3}$/.test(entered)) candidates.push(entered.padStart(4, '0'));   // 생일 PIN 앞 0 생략 허용
+  for (const cand of candidates) {
+    if ((await hashPin(cand)) === s.pinHash) { logAccess(code, studentNo); return { ok:true }; }
+  }
+  return { ok:false, message:'비밀번호가 틀렸어요. 다시 입력하세요.' };
+}
+
+function logAccess(code, studentNo) {
+  const entry = { studentNo:String(studentNo), ts:Date.now(), sessionId:Math.random().toString(36).slice(2, 10) };
+  if (isLocal()) { const l = LS.get(`cls.${code}.logs`, []); l.push(entry); LS.set(`cls.${code}.logs`, l.slice(-500)); return Promise.resolve(); }
+  return db.collection('classes').doc(code).collection('logs').add(entry).catch(e => console.warn('접속 로그 실패', e));
+}
+
+/* ═══ 기록 ═══ */
+async function loadResults(code) {
+  return cached('results:' + code, async () => {
+    if (isLocal()) return LS.get(`cls.${code}.results`, []);
+    const snap = await db.collection('classes').doc(code).collection('results').orderBy('ts', 'desc').limit(3000).get();
+    return snap.docs.map(d => d.data());
+  });
+}
+
+async function saveResult(code, payload) {
+  const outcome = Levels.buildScoreOutcome(payload);
+  const row = Object.assign({}, payload, { score: outcome.recordedScore, ts: Date.now(), dateKey: dateKey(new Date()) });
   try {
-    if (isLocal()) { const r = LS.get('results', []); r.push(row); LS.set('results', r); }
-    else await db.collection(COL.results).add(row);
+    if (isLocal()) { const r = LS.get(`cls.${code}.results`, []); r.push(row); LS.set(`cls.${code}.results`, r); }
+    else await db.collection('classes').doc(code).collection('results').add(row);
     invalidate();
   } catch (e) {
     console.warn('결과 저장 실패', e);
@@ -132,22 +287,20 @@ async function saveResult(payload) {
   return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
 }
 
-/* ═══ 조회 ═══ */
-async function getBestScores(studentNo) {
-  const rows = await loadResults();
+async function getBestScores(code, studentNo) {
+  const rows = await loadResults(code);
   const best = {};
   rows.forEach(r => {
     if (String(r.studentNo) !== String(studentNo)) return;
-    if (r.score === null || r.score === undefined) return;
     const s = Number(r.score);
-    if (isNaN(s)) return;
+    if (r.score === null || r.score === undefined || isNaN(s)) return;
     if (!best[r.level] || s > best[r.level]) best[r.level] = s;
   });
   return best;
 }
 
-async function getHistory(studentNo) {
-  const rows = await loadResults();
+async function getHistory(code, studentNo) {
+  const rows = await loadResults(code);
   return rows
     .filter(r => String(r.studentNo) === String(studentNo) && r.score !== null && r.score !== undefined)
     .map(r => ({ ts:r.ts, label:fmtTime(r.ts), score:Number(r.score), level:r.level }))
@@ -156,34 +309,31 @@ async function getHistory(studentNo) {
 
 const levelWeight = lv => Levels.LEVEL_ORDER.indexOf(lv) + 1;
 function compareEntries(a, b) {
-  let d = b.score - a.score;              if (d) return d;
-  d = levelWeight(b.level) - levelWeight(a.level); if (d) return d;
-  d = a.ts - b.ts;                        if (d) return d;
+  let d = b.score - a.score;                        if (d) return d;
+  d = levelWeight(b.level) - levelWeight(a.level);  if (d) return d;
+  d = a.ts - b.ts;                                  if (d) return d;
   return String(a.studentNo).localeCompare(String(b.studentNo));
 }
 
-/** 학생별 최고 기록으로 랭킹 계산 */
-async function getRanking(limit) {
-  const [rows, students] = await Promise.all([loadResults(), getStudents()]);
+async function getRanking(code, limit) {
+  const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
   const names = {};
   students.forEach(s => names[String(s.number)] = s.name);
   const best = {};
   rows.forEach(r => {
-    if (r.score === null || r.score === undefined) return;
     const score = Number(r.score);
-    if (isNaN(score)) return;
+    if (r.score === null || r.score === undefined || isNaN(score)) return;
     const no = String(r.studentNo);
     const e = { studentNo:no, name:names[no] || `학생 ${no}`, level:r.level, score, ts:r.ts };
     if (!best[no] || compareEntries(e, best[no]) < 0) best[no] = e;
   });
-  const ranked = Object.values(best).sort(compareEntries);
-  const out = ranked.map((it, i) => ({ rank:`${i + 1}등`, name:it.name, level:it.level, score:it.score }));
-  return limit ? out.slice(0, limit) : out;
+  const ranked = Object.values(best).sort(compareEntries)
+    .map((it, i) => ({ rank:`${i + 1}등`, name:it.name, level:it.level, score:it.score }));
+  return limit ? ranked.slice(0, limit) : ranked;
 }
 
-/** 두 날짜의 학생별 최고 점수 비교 */
-async function getComparison(date1Key, date2Key) {
-  const [rows, students] = await Promise.all([loadResults(), getStudents()]);
+async function getComparison(code, date1Key, date2Key) {
+  const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
   const byStudent = {};
   rows.forEach(r => {
     if (r.score === null || r.score === undefined) return;
@@ -206,26 +356,22 @@ async function getComparison(date1Key, date2Key) {
   });
 }
 
-/** 최근 24시간, 10분 안에 3회 이상 접속한 학생 */
-async function getAccessAlerts() {
+async function getAccessAlerts(code) {
+  const cutoff = Date.now() - 24 * 3600 * 1000;
   let logs;
-  if (isLocal()) logs = LS.get('logs', []);
+  if (isLocal()) logs = LS.get(`cls.${code}.logs`, []);
   else {
-    const cutoff = Date.now() - 24 * 3600 * 1000;
-    const snap = await db.collection(COL.logs).where('ts', '>=', cutoff).get();
+    const snap = await db.collection('classes').doc(code).collection('logs').where('ts', '>=', cutoff).get();
     logs = snap.docs.map(d => d.data());
   }
-  const cutoff = Date.now() - 24 * 3600 * 1000;
-  const students = await getStudents();
+  const students = await getStudents(code);
   const names = {};
   students.forEach(s => names[String(s.number)] = s.name);
-
   const byStudent = {};
   logs.forEach(l => {
     if (!l.ts || l.ts < cutoff) return;
     (byStudent[String(l.studentNo)] = byStudent[String(l.studentNo)] || []).push(l.ts);
   });
-
   const alerts = [];
   Object.keys(byStudent).forEach(no => {
     const t = byStudent[no].sort((a, b) => a - b);
@@ -233,29 +379,12 @@ async function getAccessAlerts() {
     for (let i = 0; i + 2 < t.length; i++) {
       if (t[i + 2] - t[i] < 10 * 60 * 1000) {
         alerts.push({ studentNo:no, name:names[no] || `학생 ${no}`, count:t.length,
-          message:`${no}번 ${names[no] || ''} — 10분 내 3회 이상 접속 (${fmtTime(t[i])}경)` });
+          message:`${no}번 ${names[no] || ''} — 10분 내 3회 이상 접속 (${fmtTime(t[i]).slice(-5)}경)` });
         break;
       }
     }
   });
   return alerts;
-}
-
-/* ═══ 교사 PIN ═══ */
-async function verifyTeacherPin(pin) {
-  const entered = String(pin || '').trim();
-  if (!entered) return { ok:false, message:'PIN을 입력하세요.' };
-  let stored = null;
-  if (!isLocal()) {
-    try {
-      const doc = await db.collection(COL.config).doc('app').get();
-      if (doc.exists) stored = doc.data();
-    } catch (e) { /* 규칙상 읽기 불가면 기본 PIN 사용 */ }
-  }
-  const expectHash = stored && stored.teacherPinHash;
-  const expectPlain = (stored && stored.teacherPin) || window.DEFAULT_TEACHER_PIN || '490800';
-  const ok = expectHash ? (await hashPin(entered)) === expectHash : entered === String(expectPlain);
-  return ok ? { ok:true } : { ok:false, message:'PIN이 올바르지 않습니다.' };
 }
 
 /* ═══ 날짜 유틸 ═══ */
@@ -268,8 +397,10 @@ function fmtTime(ts) {
 
 return {
   init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate,
-  getStudents, verifyStudentPin, logAccess,
-  saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts,
-  verifyTeacherPin
+  auth,
+  listClasses, createClass, renameClass, archiveClass, getClass,
+  getStudents, upsertStudent, deleteStudent, bulkImport,
+  verifyStudentPin, logAccess,
+  saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts
 };
 })();

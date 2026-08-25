@@ -1,12 +1,19 @@
 rules_version = '2';
 
-/* 인증 없이 쓰는 교실용 규칙.
- * - 읽기는 열려 있고, 기록은 '새로 추가'만 가능하며 수정·삭제는 막는다.
- * - 학생 명단과 설정은 교사가 Firebase 콘솔에서만 바꿀 수 있다.
- * ⚠️ 인증이 없으므로 URL을 아는 사람은 누구나 기록을 읽을 수 있다. (README 참고)
+/* 반 단위 다중 교사 체계.
+ * - 교사: Firebase 인증(이메일)으로 로그인. 자기 반의 명단·설정만 쓸 수 있다.
+ * - 학생: 로그인 없음. 반 코드를 알면 명단을 읽고 기록을 '추가만' 할 수 있다.
+ * ⚠️ 학생 기록은 인증 없이 추가되므로 반 코드를 아는 사람은 기록을 읽거나
+ *    위조 기록을 넣을 수 있다 (기존과 동일한 한계).
  */
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(code) {
+      return signedIn()
+        && get(/databases/$(database)/documents/classes/$(code)).data.teacherUid == request.auth.uid;
+    }
 
     function validResult() {
       let d = request.resource.data;
@@ -30,30 +37,56 @@ service cloud.firestore {
         && d.ts is number;
     }
 
-    // 학생 명단 — 앱은 읽기만, 수정은 콘솔에서
-    match /students/{id} {
-      allow read: if true;
-      allow write: if false;
+    function validStudent() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['number', 'name'])
+        && d.keys().size() <= 5
+        && d.number is string && d.number.size() >= 1 && d.number.size() <= 20
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 40;
     }
 
-    // 연습 결과 — 추가만 가능, 고치거나 지울 수 없음
-    match /results/{id} {
-      allow read: if true;
-      allow create: if validResult();
-      allow update, delete: if false;
+    function validClass() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['teacherUid', 'name'])
+        && d.keys().size() <= 6
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 60;
     }
 
-    // 접속 로그 — 추가만 가능
-    match /accessLogs/{id} {
-      allow read: if true;
-      allow create: if validLog();
-      allow update, delete: if false;
+    // 교사 프로필 — 본인만
+    match /teachers/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
-    // 앱 설정(교사 PIN 해시 등)
-    match /config/{id} {
+    // 반 — 만들 때는 본인을 담당으로, 고칠 때는 담당 교사만 (담당 이전 불가)
+    match /classes/{code} {
       allow read: if true;
-      allow write: if false;
+      allow create: if signedIn() && validClass()
+        && request.resource.data.teacherUid == request.auth.uid;
+      allow update: if signedIn() && resource.data.teacherUid == request.auth.uid
+        && request.resource.data.teacherUid == resource.data.teacherUid && validClass();
+      allow delete: if false;   // 삭제 대신 archived 플래그 사용
+
+      // 학생 명단 — 읽기는 공개(반 코드가 곧 접근권), 쓰기는 담당 교사만
+      match /students/{id} {
+        allow read: if true;
+        allow create, update: if isOwner(code) && validStudent();
+        allow delete: if isOwner(code);
+      }
+
+      // 기록 — 추가는 누구나(검증 통과 시), 수정 불가, 삭제는 담당 교사만
+      match /results/{id} {
+        allow read: if true;
+        allow create: if validResult();
+        allow update: if false;
+        allow delete: if isOwner(code);
+      }
+
+      // 접속 로그 — 추가만
+      match /logs/{id} {
+        allow read: if true;
+        allow create: if validLog();
+        allow update, delete: if false;
+      }
     }
 
     match /{document=**} {
