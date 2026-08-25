@@ -82,7 +82,13 @@ async function verifyStudentPin(studentNo, pin) {
   const hasPin = !!(s.pinHash || s.pin);
   if (!hasPin) { logAccess(studentNo); return { ok:true, noPinSet:true }; }     // 아직 PIN 미설정
   const entered = String(pin || '').trim();
-  const ok = s.pinHash ? (await hashPin(entered)) === s.pinHash : entered === String(s.pin).trim();
+  // 생일 PIN(월일 4자리)의 앞자리 0을 빼고 입력해도 통과하도록 두 형태 모두 확인
+  const candidates = [entered];
+  if (/^\d{1,3}$/.test(entered)) candidates.push(entered.padStart(4, '0'));
+  let ok = false;
+  for (const cand of candidates) {
+    if (s.pinHash ? (await hashPin(cand)) === s.pinHash : cand === String(s.pin).trim()) { ok = true; break; }
+  }
   if (!ok) return { ok:false, message:'비밀번호가 틀렸어요. 다시 입력하세요.' };
   logAccess(studentNo);
   return { ok:true };
