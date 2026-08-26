@@ -191,32 +191,38 @@ function genToImproper() {
 
 /* ═══════════ L5 · L6 분수 ↔ 소수 ═══════════ */
 
-/** 유한소수(세 자리 이내)가 되는 분모만 사용 */
+/** 유한소수(세 자리 이내)가 되는 분모 (L6 소수→분수 용) */
 const DEC_DENOMS = [2, 4, 5, 8, 10, 20, 25, 40, 50, 100, 125, 200, 250, 500];
+/** L5 분수→소수 는 분모를 10·100·1000 으로만 낸다 (소수 자릿수와 바로 대응) */
+const TENTH_DENOMS = [10, 100, 1000];
 
-function mkDecFrac() {
-  const d = pick(DEC_DENOMS);
-  const n = coprimeNumer(d);
+function mkDecFrac(opts) {
+  const o = opts || {};
+  const d = pick(o.denoms || DEC_DENOMS);
+  // 분모가 10·100·1000 일 때는 분자를 제한하지 않는다 (25/100, 5/10 도 자연스러운 문제)
+  const n = o.anyNumer ? randInt(1, d - 1) : coprimeNumer(d);
   const w = Math.random() < 0.4 ? randInt(1, 5) : 0;  // 40%는 대분수
   const frac = w ? fromMixed(w, n, d) : F(n, d);
   return { frac, dec: fracToDec(frac, 3), w, n, d };
 }
 
 function genFracToDec() {
-  const { frac, dec, w, n, d } = mkDecFrac();
+  const { frac, dec, w, n, d } = mkDecFrac({ denoms: TENTH_DENOMS, anyNumer: true });
   const ans = textD(dec);
-  const shift = (dd, k) => textD(normD(D(dd.v, Math.min(3, Math.max(0, dd.p + k)))));
+  const p = Math.max(1, dec.p);
+  const shift = k => textD(normD(D(dec.v, Math.min(3, Math.max(0, dec.p + k)))));
   const cands = [
-    shift(dec, 1), shift(dec, -1),                     // 소수점 위치 실수
-    `${w}.${n}${d}`.replace(/^0\./, '0.'),             // 3/4 → 0.34 같은 그대로 붙이기
-    w ? `${w}.${n}` : `0.${n}`,
-    textD(addD(dec, D(1, dec.p || 1)))
-  ].filter(t => t !== ans && /^\d+(\.\d+)?$/.test(t)).map(t => decC(t, false));
+    shift(1), shift(-1),                               // 소수점 자리를 한 칸 틀린 답
+    w ? textD(fracToDec(F(n, d), 3)) : null,           // 대분수에서 정수부를 빠뜨린 답
+    textD(addD(dec, D(1, p))),
+    textD(subD(dec, D(1, p)))
+  ].filter(t => t && t !== ans && /^\d+(\.\d+)?$/.test(t)).map(t => decC(t, false));
   const shown = w ? mixedHTML(frac) : fracHTML(frac);
   return {
     display: eqQ(`${shown}<span class="q-op">→</span><span class="q-hint">소수</span>`),
     choices: finalize(decC(ans, true), cands,
-      () => { const alt = mkDecFrac(); const t = textD(alt.dec); return t === ans ? null : decC(t, false); })
+      () => { const alt = mkDecFrac({ denoms: TENTH_DENOMS, anyNumer: true }); const t = textD(alt.dec);
+              return t === ans ? null : decC(t, false); })
   };
 }
 

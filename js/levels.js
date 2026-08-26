@@ -41,7 +41,7 @@ const LEVEL_CONFIGS = {
          label:'대분수 → 가분수', desc:'정수 × 분모 + 분자',
          theme:{bg:'bg-amber-50',  border:'border-amber-300',  hbg:'hover:bg-amber-100',  lbl:'text-amber-900',  descCls:'text-amber-700'} },
   L5:  { group:'convert', engine:'choice', type:'frac-to-dec',chalQ:20, chalTime:T(20,15),
-         label:'분수 → 소수', desc:'소수점 아래 세 자리까지 · 대분수 포함',
+         label:'분수 → 소수', desc:'분모가 10 · 100 · 1000인 분수 · 대분수 포함',
          theme:{bg:'bg-orange-50', border:'border-orange-200', hbg:'hover:bg-orange-100', lbl:'text-orange-800', descCls:'text-orange-600'} },
   L6:  { group:'convert', engine:'choice', type:'dec-to-frac',chalQ:20, chalTime:T(20,15),
          label:'소수 → 분수', desc:'기약분수로 나타내기 · 대분수 포함',
