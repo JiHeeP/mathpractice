@@ -326,7 +326,37 @@ function fracAnswer(p) {
 
 /* ═══════════ 분수 계산 4지선다 ═══════════ */
 
-/** 답이 진분수인 계산 (L7·L8·L14) */
+/** 분모가 같은 덧셈·뺄셈 (L7·L8)
+ *  이 단계의 목표는 '분모는 그대로 두고 분자끼리 계산' 이므로 약분은 다루지 않는다.
+ *  약분하지 않은 답이 정답이고, 값이 같은 보기(기약분수 등)는 아예 내지 않는다.
+ */
+function sameDenomCalcQuestion(p) {
+  const d = p.A.d;
+  const n = p.sign === '+' ? p.A.n + p.B.n : p.A.n - p.B.n;
+  const ans = F(n, d);
+
+  const raw = [];
+  if (p.sign === '+') raw.push(F(n, d * 2));                    // 분모끼리도 더해버림
+  const opp = p.sign === '+' ? p.A.n - p.B.n : p.A.n + p.B.n;   // 연산을 반대로 함
+  raw.push(F(opp, d));
+  [1, -1, 2, -2].forEach(k => raw.push(F(n + k, d)));           // 분자를 잘못 셈
+
+  const cands = raw
+    .filter(f => f.n >= 1 && f.d >= 2 && f.n < f.d && !eqValue(f, ans))
+    .map(f => fracC(f, false));
+
+  return {
+    display: eqQ(`${fracHTML(p.A)}<span class="q-op">${p.sign}</span>${fracHTML(p.B)}`),
+    choices: finalize(fracC(ans, true), cands, () => {
+      // 분모가 작으면 같은 분모만으로는 보기가 모자라므로 분모도 살짝 바꿔 채운다
+      const dd = pick([d, d, d * 2, d + 1, d + 2]);
+      const f = F(randInt(1, dd - 1), dd);
+      return eqValue(f, ans) ? null : fracC(f, false);
+    })
+  };
+}
+
+/** 답이 진분수인 계산 (L14) */
 function properCalcQuestion(p) {
   const ans = fracAnswer(p);
   const raw = p.sign === '+' ? addRaw(p.A, p.B) : subRaw(p.A, p.B);
@@ -456,8 +486,8 @@ const CHOICE_GENS = {
   'to-improper': genToImproper,
   'frac-to-dec': genFracToDec,
   'dec-to-frac': genDecToFrac,
-  'same-add':    () => properCalcQuestion(genSameAdd()),
-  'same-sub':    () => properCalcQuestion(genSameSub()),
+  'same-add':    () => sameDenomCalcQuestion(genSameAdd()),
+  'same-sub':    () => sameDenomCalcQuestion(genSameSub()),
   'lcm':         genLcm,
   'common-denom':genCommonDenom,
   'diff-add1':   () => mixedCalcQuestion(genDiffAdd1()),

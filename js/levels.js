@@ -48,10 +48,10 @@ const LEVEL_CONFIGS = {
          theme:{bg:'bg-orange-50', border:'border-orange-300', hbg:'hover:bg-orange-100', lbl:'text-orange-900', descCls:'text-orange-700'} },
 
   L7:  { group:'same',    engine:'choice', type:'same-add',   chalQ:20, chalTime:T(20,13),
-         label:'분모가 같은 분수의 덧셈', desc:'분자끼리 더하고 약분하기',
+         label:'분모가 같은 분수의 덧셈', desc:'분모는 그대로, 분자끼리 더하기',
          theme:{bg:'bg-green-50',  border:'border-green-200',  hbg:'hover:bg-green-100',  lbl:'text-green-800',  descCls:'text-green-600'} },
   L8:  { group:'same',    engine:'choice', type:'same-sub',   chalQ:20, chalTime:T(20,13),
-         label:'분모가 같은 분수의 뺄셈', desc:'분자끼리 빼고 약분하기',
+         label:'분모가 같은 분수의 뺄셈', desc:'분모는 그대로, 분자끼리 빼기',
          theme:{bg:'bg-green-50',  border:'border-green-300',  hbg:'hover:bg-green-100',  lbl:'text-green-900',  descCls:'text-green-700'} },
 
   L9:  { group:'common',  engine:'choice', type:'lcm',        chalQ:20, chalTime:T(20,15),
