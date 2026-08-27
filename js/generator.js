@@ -58,6 +58,7 @@ const eqQ = inner => `${inner}<span class="q-op">=</span><span class="text-gray-
 
 const NEAR_REDUCE = '값은 맞아요! 하지만 <b>기약분수</b>를 골라야 해요';
 const NEAR_MIXED  = '값은 맞아요! 하지만 <b>대분수</b>로 나타낸 것을 골라야 해요';
+const NEAR_TENTH  = '값은 맞아요! 하지만 분모를 <b>10 · 100 · 1000</b> 중 하나로 나타내야 해요';
 
 /* ═══════════ L1 · L2 그림 개념 ═══════════ */
 
@@ -191,15 +192,13 @@ function genToImproper() {
 
 /* ═══════════ L5 · L6 분수 ↔ 소수 ═══════════ */
 
-/** 유한소수(세 자리 이내)가 되는 분모 (L6 소수→분수 용) */
-const DEC_DENOMS = [2, 4, 5, 8, 10, 20, 25, 40, 50, 100, 125, 200, 250, 500];
-/** L5 분수→소수 는 분모를 10·100·1000 으로만 낸다 (소수 자릿수와 바로 대응) */
+/** L5·L6 은 분모를 10·100·1000 으로만 쓴다 — 소수 자릿수와 그대로 대응된다 */
 const TENTH_DENOMS = [10, 100, 1000];
+const POW10 = [1, 10, 100, 1000];
 
 function mkDecFrac(opts) {
   const o = opts || {};
-  const d = pick(o.denoms || DEC_DENOMS);
-  // 분모가 10·100·1000 일 때는 분자를 제한하지 않는다 (25/100, 5/10 도 자연스러운 문제)
+  const d = pick(o.denoms || TENTH_DENOMS);
   const n = o.anyNumer ? randInt(1, d - 1) : coprimeNumer(d);
   const w = Math.random() < 0.4 ? randInt(1, 5) : 0;  // 40%는 대분수
   const frac = w ? fromMixed(w, n, d) : F(n, d);
@@ -227,22 +226,39 @@ function genFracToDec() {
 }
 
 function genDecToFrac() {
-  const { frac, dec } = mkDecFrac();
-  const answer = reduce(frac);
-  const isMix = isImproper(answer);
-  const correct = isMix ? mixC(answer, true) : fracC(answer, true);
-  const raw = F(dec.v, Math.pow(10, dec.p));           // 75/100 — 약분 안 한 보기
-  const cands = [];
-  if (!eqExact(reduce(raw), raw)) cands.push(fracC(raw, false, NEAR_REDUCE));
-  if (isMix) cands.push(fracC(answer, false, NEAR_MIXED));   // 가분수 그대로 쓴 보기
-  const m = toMixed(answer);
-  cands.push(isMix ? mixC(fromMixed(m.w, Math.min(m.n + 1, m.d - 1) === m.n ? Math.max(1, m.n - 1) : m.n + 1, m.d), false)
-                   : fracC(F(answer.n, answer.d + 1), false));
-  cands.push(fracC(F(dec.v % 100 || 1, 10), false));
+  /* 소수를 먼저 정하고, 그 자릿수에 그대로 대응하는 분모(10·100·1000)를 정답으로 삼는다.
+     끝자리가 0인 소수는 만들지 않아 자릿수와 분모가 항상 1:1로 맞는다. */
+  const p = pick([1, 2, 3]);
+  const d = POW10[p];
+  let n;
+  do { n = randInt(1, d - 1); } while (n % 10 === 0);
+  const w = Math.random() < 0.4 ? randInt(1, 5) : 0;   // 40%는 1보다 큰 소수
+  const dec = D(w * d + n, p);
+  const answer = w ? fromMixed(w, n, d) : F(n, d);
+  const correct = w ? mixC(answer, true) : fracC(answer, true);
+
+  // 분자가 분모보다 크면 대분수 표기가 뒤틀리므로 진분수 범위만 보기로 쓴다
+  const asChoice = (ww, nn, dd, near) =>
+    (nn >= 1 && dd >= 2 && nn < dd)
+      ? (ww ? mixC(fromMixed(ww, nn, dd), false, near) : fracC(F(nn, dd), false, near))
+      : null;
+
+  const reduced = reduce(F(n, d));                      // 약분해 버린 답 — 이 레벨에서는 오답
+  const cands = [
+    p < 3 ? asChoice(w, n, POW10[p + 1]) : null,        // 분모를 한 칸 크게
+    p > 1 ? asChoice(w, n, POW10[p - 1]) : null,        // 분모를 한 칸 작게
+    (reduced.d !== d) ? asChoice(w, reduced.n, reduced.d, NEAR_TENTH) : null,
+    w ? fracC(F(n, d), false, '정수 부분을 빠뜨렸어요') : null,
+    asChoice(w, n + 1, d),
+    n > 1 ? asChoice(w, n - 1, d) : null
+  ].filter(c => c && c.key !== correct.key);
+
   return {
     display: eqQ(`<span class="qc-num">${textD(dec)}</span><span class="q-op">→</span><span class="q-hint">분수</span>`),
-    choices: finalize(correct, cands.filter(c => c && !c.correct),
-      () => { const dd = randInt(2, 12); const f = F(coprimeNumer(dd), dd); return eqValue(f, answer) ? null : fracC(f, false); })
+    choices: finalize(correct, cands, () => {
+      const alt = randInt(1, d - 1);
+      return alt === n ? null : asChoice(w, alt, d);
+    })
   };
 }
 
