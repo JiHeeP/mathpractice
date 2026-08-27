@@ -58,7 +58,6 @@ const eqQ = inner => `${inner}<span class="q-op">=</span><span class="text-gray-
 
 const NEAR_REDUCE = '값은 맞아요! 하지만 <b>기약분수</b>를 골라야 해요';
 const NEAR_MIXED  = '값은 맞아요! 하지만 <b>대분수</b>로 나타낸 것을 골라야 해요';
-const NEAR_TENTH  = '값은 맞아요! 하지만 분모를 <b>10 · 100 · 1000</b> 중 하나로 나타내야 해요';
 
 /* ═══════════ L1 · L2 그림 개념 ═══════════ */
 
@@ -199,7 +198,10 @@ const POW10 = [1, 10, 100, 1000];
 function mkDecFrac(opts) {
   const o = opts || {};
   const d = pick(o.denoms || TENTH_DENOMS);
-  const n = o.anyNumer ? randInt(1, d - 1) : coprimeNumer(d);
+  // 끝자리가 0인 분자(520/1000 등)는 소수 자릿수가 줄어 분모와 어긋나므로 쓰지 않는다
+  let n;
+  if (o.anyNumer) { do { n = randInt(1, d - 1); } while (n % 10 === 0); }
+  else n = coprimeNumer(d);
   const w = Math.random() < 0.4 ? randInt(1, 5) : 0;  // 40%는 대분수
   const frac = w ? fromMixed(w, n, d) : F(n, d);
   return { frac, dec: fracToDec(frac, 3), w, n, d };
@@ -243,14 +245,16 @@ function genDecToFrac() {
       ? (ww ? mixC(fromMixed(ww, nn, dd), false, near) : fracC(F(nn, dd), false, near))
       : null;
 
-  const reduced = reduce(F(n, d));                      // 약분해 버린 답 — 이 레벨에서는 오답
+  /* 보기는 모두 분모가 10·100·1000 인 형태로만 낸다.
+     약분한 분수(21/50 같은)는 헷갈리기만 하므로 아예 내지 않는다. */
   const cands = [
     p < 3 ? asChoice(w, n, POW10[p + 1]) : null,        // 분모를 한 칸 크게
     p > 1 ? asChoice(w, n, POW10[p - 1]) : null,        // 분모를 한 칸 작게
-    (reduced.d !== d) ? asChoice(w, reduced.n, reduced.d, NEAR_TENTH) : null,
     w ? fracC(F(n, d), false, '정수 부분을 빠뜨렸어요') : null,
     asChoice(w, n + 1, d),
-    n > 1 ? asChoice(w, n - 1, d) : null
+    n > 1 ? asChoice(w, n - 1, d) : null,
+    asChoice(w, n + 2, d),
+    n > 2 ? asChoice(w, n - 2, d) : null
   ].filter(c => c && c.key !== correct.key);
 
   return {
