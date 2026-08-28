@@ -32,6 +32,19 @@
 .yn-yes{background:#ecfdf5;color:#047857;border-color:#6ee7b7}.yn-yes:hover{background:#d1fae5}
 .yn-no{background:#fef2f2;color:#b91c1c;border-color:#fca5a5}.yn-no:hover{background:#fee2e2}
 
+/* ══ 단계별 시간 (과정형 레벨) ══ */
+.st-clock{display:inline-flex;align-items:center;white-space:nowrap;border-radius:9999px;padding:.1rem .55rem;font-size:.72rem;font-weight:800;font-variant-numeric:tabular-nums;opacity:.85}
+.tt{margin:0 auto 1.25rem;max-width:24rem;background:#fff;border:1px solid #e5e7eb;border-radius:1rem;padding:.5rem .25rem;text-align:left}
+.tt-head{padding:.25rem .75rem .45rem;font-size:.72rem;font-weight:800;color:#9ca3af;letter-spacing:.05em}
+.tt-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .75rem;font-size:.85rem;font-weight:700;color:#4b5563;border-top:1px solid #f3f4f6}
+.tt-no{flex:0 0 3.6rem;font-size:.7rem;font-weight:800;color:#9ca3af}
+.tt-desc{flex:1;min-width:0;word-break:keep-all}
+.tt-time{font-variant-numeric:tabular-nums;font-weight:800;color:#374151;white-space:nowrap}
+.tt-sub{font-size:.72rem;font-weight:700;color:#9ca3af}
+.tt-slow .tt-time{color:#c2410c}
+.tt-total{border-top:2px solid #e5e7eb;color:#1f2937}
+.tt-total .tt-time{color:#4338ca}
+
 /* ══ 4지선다 ══ */
 .quiz-q{font-size:2.5rem;font-weight:900;color:#1f2937;display:flex;align-items:center;justify-content:center;flex-wrap:wrap}
 @media(max-width:420px){.quiz-q{font-size:1.9rem}}

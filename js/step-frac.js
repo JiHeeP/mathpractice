@@ -25,6 +25,7 @@ const ROW_LABELS = {
 };
 
 let level, cfg, prob, steps, idx, probOK, waiting, rows;
+let stepStart, stepTick, stepLog, probStart, sessionLog;
 
 /** 아직 값이 정해지지 않은 자리를 포함한 분수 표기 */
 const slot = (n, d) => `<span class="fr"><span class="fr-n">${n}</span><span class="fr-d">${d}</span></span>`;
@@ -32,6 +33,7 @@ const slot = (n, d) => `<span class="fr"><span class="fr-n">${n}</span><span cla
 /* ═══ 시작 ═══ */
 function init(lv, mode, config, onExit) {
   level = lv; cfg = config;
+  sessionLog = [];
   Session.start(lv, mode, config, 'frac', onExit);
   next();
 }
@@ -39,10 +41,67 @@ function init(lv, mode, config, onExit) {
 function next() {
   prob = Gen.generateStepProblem(level);
   idx = 0; probOK = true; waiting = false;
+  stepLog = []; probStart = Date.now();
   buildSteps();
   render();
   Session.startTimer();
   showStep();
+}
+
+/* ═══ 단계별 시간 ═══ */
+/** 밀리초 → '3.4초' / '1분 5.2초' */
+function secText(ms) {
+  const s = ms / 1000;
+  return s < 60 ? `${s.toFixed(1)}초` : `${Math.floor(s / 60)}분 ${(s % 60).toFixed(1)}초`;
+}
+
+/** 지금 단계의 간단한 시계 — 0.1초마다 칩 하나만 고쳐 쓴다 */
+function startStepClock() {
+  stopStepClock();
+  stepStart = Date.now();
+  const paint = () => {
+    const el = document.getElementById('stepClock');
+    if (!el) return stopStepClock();          // 화면이 바뀌면 스스로 멈춘다
+    el.textContent = `⏱ ${secText(Date.now() - stepStart)}`;
+  };
+  paint();
+  stepTick = setInterval(paint, 100);
+}
+function stopStepClock() { if (stepTick) { clearInterval(stepTick); stepTick = null; } }
+
+/** 방금 푼 문제의 단계별 수행 시간 표 */
+function timeBoardHTML() {
+  if (!stepLog.length) return '';
+  const total = Date.now() - probStart;
+  const worst = stepLog.reduce((a, b) => (b.ms > a.ms ? b : a)).ms;
+  return `<div class="tt">
+    <div class="tt-head">⏱ 단계별 수행 시간</div>
+    ${stepLog.map(r => `<div class="tt-row${r.ms === worst && stepLog.length > 1 ? ' tt-slow' : ''}">
+      <span class="tt-no">STEP ${r.no}</span>
+      <span class="tt-desc">${r.ok ? '' : '❌ '}${r.desc}</span>
+      <span class="tt-time">${secText(r.ms)}</span>
+    </div>`).join('')}
+    <div class="tt-row tt-total"><span class="tt-desc">이 문제 전체</span><span class="tt-time">${secText(total)}</span></div>
+  </div>`;
+}
+
+/** 도전 완료 후 — 같은 이름의 단계끼리 묶은 평균 수행 시간 */
+function summaryHTML() {
+  if (!sessionLog.length) return '';
+  const by = new Map();
+  sessionLog.forEach(r => {
+    const cur = by.get(r.desc) || { desc: r.desc, n: 0, ms: 0, wrong: 0 };
+    cur.n++; cur.ms += r.ms; if (!r.ok) cur.wrong++;
+    by.set(r.desc, cur);
+  });
+  const rows = [...by.values()].sort((a, b) => b.ms / b.n - a.ms / a.n);
+  return `<div class="tt mt-4">
+    <div class="tt-head">⏱ 단계별 평균 수행 시간 (오래 걸린 순)</div>
+    ${rows.map(r => `<div class="tt-row">
+      <span class="tt-desc">${r.desc}</span>
+      <span class="tt-time">${secText(r.ms / r.n)}<span class="tt-sub"> · ${r.n}회${r.wrong ? ` · 오답 ${r.wrong}` : ''}</span></span>
+    </div>`).join('')}
+  </div>`;
 }
 
 /* ═══ 풀이판 ═══ */
@@ -267,6 +326,7 @@ function showStep() {
   const s = steps[idx], cl = PAL[idx % PAL.length], qa = document.getElementById('stepQArea');
 
   if (s.type === 'auto') {
+    stopStepClock();
     if (s.fn) s.fn();
     qa.innerHTML = `<div style="background:${cl.bg};border:1.5px solid ${cl.bd};" class="p-4 rounded-2xl text-center">
       <div class="text-sm font-bold mb-1" style="color:${cl.tx}">${s.desc}</div>
@@ -277,14 +337,16 @@ function showStep() {
   }
 
   qa.innerHTML = `<div style="background:${cl.bg};border:1.5px solid ${cl.bd};" class="p-5 rounded-2xl text-center">
-    <div class="flex items-center justify-center gap-2 mb-3">
-      <span style="background:${cl.badge};color:${cl.tx};" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-black">STEP ${idx + 1}</span>
+    <div class="flex flex-wrap items-center justify-center gap-2 mb-3">
+      <span style="background:${cl.badge};color:${cl.tx};" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-black whitespace-nowrap">STEP ${idx + 1}</span>
       <span style="color:${cl.tx};" class="text-sm font-bold">${s.desc}</span>
+      <span id="stepClock" style="background:${cl.badge};color:${cl.tx};" class="st-clock">⏱ 0.0초</span>
     </div>
     <div class="step-q">${s.q}</div>
     ${inputHTML(s.type)}
     <div id="stepFb" class="min-h-8 mt-3 font-bold text-lg"></div>
   </div>`;
+  startStepClock();
   if (s.type !== 'yn') wireInputs(s.type);
 }
 
@@ -342,24 +404,31 @@ function answerYN(v) {
 
 function finishStep(ok, fb, s, note, isYN) {
   waiting = true;
+  const ms = Date.now() - stepStart;
+  stopStepClock();
+  stepLog.push({ no: idx + 1, desc: s.desc, ms, ok });
+  const took = `<div class="text-sm font-bold text-gray-400 mt-1">⏱ 수행 시간 ${secText(ms)}</div>`;
   if (s.fn) s.fn();                                   // 맞든 틀리든 풀이판은 정답으로 진행
   if (ok) {
-    fb.innerHTML = '<span class="text-green-600">정답! ⭕</span>';
+    fb.innerHTML = '<span class="text-green-600">정답! ⭕</span>' + took;
     setTimeout(() => { waiting = false; idx++; showStep(); }, 600);
   } else {
     probOK = false;
     const answer = isYN ? `<b>${s.exp ? '예' : '아니오'}</b>` : expectedHTML(s.type, s.exp);
     fb.innerHTML = `<span class="text-red-500">틀렸어요 ❌ 정답: ${answer}</span>` +
-                   (note ? `<div class="text-sm text-amber-600 mt-1">${note}</div>` : '');
+                   (note ? `<div class="text-sm text-amber-600 mt-1">${note}</div>` : '') + took;
     setTimeout(() => { waiting = false; idx++; showStep(); }, note ? 1800 : 1200);
   }
 }
 
 /* ═══ 문제 완료 ═══ */
 function onProbDone() {
+  stopStepClock();
+  const board = timeBoardHTML();
+  sessionLog = sessionLog.concat(stepLog);
   const done = Session.problemDone(probOK);
   if (done) {
-    document.getElementById('stepQArea').innerHTML = Session.finishHTML();
+    document.getElementById('stepQArea').innerHTML = Session.finishHTML() + summaryHTML();
     Session.saveResult();
     return;
   }
@@ -369,7 +438,8 @@ function onProbDone() {
     <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 text-center">
       <div class="text-4xl mb-2">${probOK ? '🎉' : '💪'}</div>
       <div class="text-xl font-black text-green-700 mb-2">${probOK ? '잘했어요!' : '한 번 더 해볼까요?'}</div>
-      <div class="text-gray-500 mb-5 flex items-center justify-center gap-2 flex-wrap">${origHTML()}<span class="q-op">=</span>${ansHTML}</div>
+      <div class="text-gray-500 mb-4 flex items-center justify-center gap-2 flex-wrap">${origHTML()}<span class="q-op">=</span>${ansHTML}</div>
+      ${board}
       <button onclick="StepFrac.next()" class="px-8 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition text-lg shadow-md active:scale-95">다음 문제 ▶</button>
     </div>`;
 }
