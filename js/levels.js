@@ -22,7 +22,7 @@ const GROUP_LABELS = {
 
 /* 제한시간 = 문제 수 × 유형별 단가(초)
  *   개념 그림 12초 · 변환 15초 · 동분모 13초 · 통분 18초 · 소수 13~14초
- *   과정형 50~80초 (피드백 대기 단축을 반영해 소폭 상향 완료)
+ *   과정형 65~104초 (단계 수가 많아 4지선다보다 넉넉하게)
  */
 const T = (q, per) => q * per;
 
@@ -61,26 +61,26 @@ const LEVEL_CONFIGS = {
          label:'분수 통분하기', desc:'최소공배수를 공통분모로',
          theme:{bg:'bg-teal-50',   border:'border-teal-300',   hbg:'hover:bg-teal-100',   lbl:'text-teal-900',   descCls:'text-teal-700'} },
 
-  L11: { group:'diff',    engine:'frac',   op:'diff-add1',    chalQ:10, chalTime:T(10,54),
+  L11: { group:'diff',    engine:'frac',   op:'diff-add1',    chalQ:10, chalTime:T(10,70),
          label:'분모가 다른 분수의 덧셈 (과정)', desc:'합이 1을 넘는 진분수 — 통분 → 계산 → 대분수',
          theme:{bg:'bg-cyan-50',   border:'border-cyan-200',   hbg:'hover:bg-cyan-100',   lbl:'text-cyan-800',   descCls:'text-cyan-600'} },
   L12: { group:'diff',    engine:'choice', type:'diff-add1',  chalQ:20, chalTime:T(20,20),
          label:'분모가 다른 분수의 덧셈', desc:'4지선다로 빠르게 풀기',
          theme:{bg:'bg-cyan-50',   border:'border-cyan-300',   hbg:'hover:bg-cyan-100',   lbl:'text-cyan-900',   descCls:'text-cyan-700'} },
-  L13: { group:'diff',    engine:'frac',   op:'diff-sub',     chalQ:10, chalTime:T(10,50),
+  L13: { group:'diff',    engine:'frac',   op:'diff-sub',     chalQ:10, chalTime:T(10,65),
          label:'분모가 다른 분수의 뺄셈 (과정)', desc:'통분 → 빼기 → 약분',
          theme:{bg:'bg-sky-50',    border:'border-sky-200',    hbg:'hover:bg-sky-100',    lbl:'text-sky-800',    descCls:'text-sky-600'} },
   L14: { group:'diff',    engine:'choice', type:'diff-sub',   chalQ:20, chalTime:T(20,19),
          label:'분모가 다른 분수의 뺄셈', desc:'4지선다로 빠르게 풀기',
          theme:{bg:'bg-sky-50',    border:'border-sky-300',    hbg:'hover:bg-sky-100',    lbl:'text-sky-900',    descCls:'text-sky-700'} },
 
-  L15: { group:'mixed',   engine:'frac',   op:'mixed-add',    chalQ:8,  chalTime:T(8,80),
+  L15: { group:'mixed',   engine:'frac',   op:'mixed-add',    chalQ:8,  chalTime:T(8,104),
          label:'대분수의 덧셈 (과정)', desc:'가분수로 → 통분 → 계산 → 대분수',
          theme:{bg:'bg-indigo-50', border:'border-indigo-200', hbg:'hover:bg-indigo-100', lbl:'text-indigo-800', descCls:'text-indigo-600'} },
   L16: { group:'mixed',   engine:'choice', type:'mixed-add',  chalQ:15, chalTime:T(15,26),
          label:'대분수의 덧셈', desc:'4지선다로 빠르게 풀기',
          theme:{bg:'bg-indigo-50', border:'border-indigo-300', hbg:'hover:bg-indigo-100', lbl:'text-indigo-900', descCls:'text-indigo-700'} },
-  L17: { group:'mixed',   engine:'frac',   op:'mixed-sub',    chalQ:8,  chalTime:T(8,80),
+  L17: { group:'mixed',   engine:'frac',   op:'mixed-sub',    chalQ:8,  chalTime:T(8,104),
          label:'대분수의 뺄셈 (과정)', desc:'가분수로 → 통분 → 계산 → 대분수',
          theme:{bg:'bg-violet-50', border:'border-violet-200', hbg:'hover:bg-violet-100', lbl:'text-violet-800', descCls:'text-violet-600'} },
   L18: { group:'mixed',   engine:'choice', type:'mixed-sub',  chalQ:15, chalTime:T(15,26),
