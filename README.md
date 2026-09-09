@@ -120,7 +120,7 @@ firebase deploy --only firestore:rules,hosting
 | 컬렉션 | 내용 |
 |---|---|
 | `teachers/{uid}` | 교사 프로필 (Firebase 인증 계정과 1:1) |
-| `classes/{반코드}` | 반 — `teacherUid`, `name`, `archived` |
+| `classes/{반코드}` | 반 — `teacherUid`, `name`, `archived`, `offDays`(등교 안 하는 날, `YYYY-MM-DD` 배열) |
 | `classes/{반코드}/students/{번호}` | 학생 — `number`, `name`, `pinHash` |
 | `classes/{반코드}/results` | 연습·도전 기록 |
 | `classes/{반코드}/logs` | 접속 로그 |
@@ -142,6 +142,22 @@ students/2   { number: "2", name: "이영희", pinHash: "9f2c..." }
 
 기본값은 `js/firebase-config.js` 의 `DEFAULT_TEACHER_PIN` (`490800`) 입니다.
 바꾸려면 `config/app` 문서에 `teacherPinHash` 를 넣으세요 (역시 `tools/pin-hash.html` 사용).
+
+### 학생 비교의 '이전 등교일' 자동 설정
+
+교사 화면 **학생 비교** 탭은 열 때마다 *비교 대상일 = 오늘*, *비교 기준일 = 오늘의 이전 등교일*로
+자동 채워집니다. 월요일에 열면 지난 금요일, 연휴 다음 날에 열면 연휴 전 마지막 등교일과 비교합니다.
+기준일을 직접 고르면 자동이 멈추고, `↺ 이전 등교일로 자동` 버튼으로 다시 켤 수 있습니다.
+
+등교일 판단(`js/schoolday.js`)은 다음을 뺀 월~금입니다.
+
+- 날짜가 고정된 공휴일 — 신정 · 3·1절 · 어린이날 · 현충일 · 광복절 · 개천절 · 한글날 · 성탄절.
+  3·1절 · 어린이날 · 광복절 · 개천절 · 한글날 · 성탄절이 토·일과 겹치면 **대체공휴일**(다음 평일)도 자동으로 뺍니다.
+- 반에서 정한 **등교 안 하는 날** — 설·추석·부처님오신날처럼 해마다 바뀌는 날, 선거일, 재량휴업일, 방학.
+  학생 비교 탭의 `📅 등교 안 하는 날 설정`에 한 줄에 하나씩(`2026-09-24`) 적고 저장하면
+  반 문서의 `offDays` 필드에 들어갑니다. `#` 뒤는 메모로 무시됩니다.
+
+`offDays` 는 반 코드만 알면 읽을 수 있으므로, 칠판 공지판 같은 다른 프로그램에서 같은 등교일 기준을 쓸 수 있습니다.
 
 ### 개인 링크
 
@@ -184,6 +200,7 @@ js/fraction.js          분수 코어 (약분 · 사칙연산 · 대분수 변�
 js/decimal.js           소수 코어 (정수 스케일 연산 · 분수↔소수 변환)
 js/pictures.js          L1·L2 그림 문제용 SVG 생성기
 js/levels.js            레벨 정의 · 잠금 규칙 · 점수 계산
+js/schoolday.js         등교일 판단 (주말 · 공휴일 · 대체공휴일 · 반별 등교 안 하는 날)
 js/generator.js         레벨별 문제 생성 + 4지선다 오답 보기
 js/db.js                Firestore / localStorage 데이터 계층
 js/session.js           연습 세션 공통 (타이머 · 결과 화면 · 저장)

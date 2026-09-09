@@ -2,7 +2,8 @@
  *
  * Firestore 구조
  *   teachers/{uid}                     : { email, createdAt }
- *   classes/{code}                     : { teacherUid, name, createdAt, archived }
+ *   classes/{code}                     : { teacherUid, name, createdAt, archived, offDays[] }
+ *                                         offDays = 반이 정한 '등교 안 하는 날' (YYYY-MM-DD 배열)
  *   classes/{code}/students/{번호}     : { number, name, pinHash }
  *   classes/{code}/results/{auto}      : 연습·도전 기록
  *   classes/{code}/logs/{auto}         : 접속 로그
@@ -132,11 +133,12 @@ async function listClasses() {
   if (isLocal()) {
     const all = LS.get('classes', {});
     return Object.entries(all).filter(([, c]) => c.teacherUid === me.uid && !c.archived)
-      .map(([code, c]) => ({ code, name: c.name }));
+      .map(([code, c]) => ({ code, name: c.name, offDays: offDaysOf(c) }));
   }
   const snap = await db.collection('classes').where('teacherUid', '==', me.uid).get();
-  return snap.docs.filter(d => !d.data().archived).map(d => ({ code: d.id, name: d.data().name }));
+  return snap.docs.filter(d => !d.data().archived).map(d => ({ code: d.id, name: d.data().name, offDays: offDaysOf(d.data()) }));
 }
+function offDaysOf(data) { return Array.isArray(data && data.offDays) ? data.offDays.map(String) : []; }
 
 async function createClass(name) {
   const me = auth.current();
@@ -146,15 +148,15 @@ async function createClass(name) {
     if (isLocal()) {
       const all = LS.get('classes', {});
       if (all[code]) continue;
-      all[code] = { teacherUid: me.uid, name, createdAt: Date.now(), archived: false };
+      all[code] = { teacherUid: me.uid, name, createdAt: Date.now(), archived: false, offDays: [] };
       LS.set('classes', all);
       LS.set(`cls.${code}.students`, []); LS.set(`cls.${code}.results`, []); LS.set(`cls.${code}.logs`, []);
-      invalidate(); return { code, name };
+      invalidate(); return { code, name, offDays: [] };
     }
     const ref = db.collection('classes').doc(code);
     if ((await ref.get()).exists) continue;
-    await ref.set({ teacherUid: me.uid, name, createdAt: Date.now(), archived: false });
-    invalidate(); return { code, name };
+    await ref.set({ teacherUid: me.uid, name, createdAt: Date.now(), archived: false, offDays: [] });
+    invalidate(); return { code, name, offDays: [] };
   }
   throw new Error('반 코드를 만들지 못했습니다. 다시 시도해 주세요.');
 }
@@ -163,6 +165,15 @@ async function renameClass(code, name) {
   if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].name = name; LS.set('classes', all); } }
   else await db.collection('classes').doc(code).update({ name });
   invalidate();
+}
+
+/** 반의 '등교 안 하는 날' 저장 — SchoolDay.normalizeOffDays 로 정리된 dateKey 배열 */
+async function setOffDays(code, offDays) {
+  const list = SchoolDay.normalizeOffDays(offDays);
+  if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].offDays = list; LS.set('classes', all); } }
+  else await db.collection('classes').doc(code).update({ offDays: list });
+  invalidate();
+  return list;
 }
 
 async function archiveClass(code) {
@@ -176,11 +187,11 @@ async function getClass(code) {
   return cached('class:' + code, async () => {
     if (isLocal()) {
       const c = (LS.get('classes', {}))[code];
-      return c && !c.archived ? { code, name: c.name, teacherUid: c.teacherUid } : null;
+      return c && !c.archived ? { code, name: c.name, teacherUid: c.teacherUid, offDays: offDaysOf(c) } : null;
     }
     const doc = await db.collection('classes').doc(code).get();
     if (!doc.exists || doc.data().archived) return null;
-    return { code, name: doc.data().name, teacherUid: doc.data().teacherUid };
+    return { code, name: doc.data().name, teacherUid: doc.data().teacherUid, offDays: offDaysOf(doc.data()) };
   });
 }
 
@@ -449,7 +460,7 @@ function fmtTime(ts) {
 return {
   init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate,
   auth,
-  listClasses, createClass, renameClass, archiveClass, getClass,
+  listClasses, createClass, renameClass, archiveClass, getClass, setOffDays,
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
