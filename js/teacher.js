@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 let authMode = 'signin';          // 'signin' | 'signup'
 let currentClass = null;          // { code, name }
 let currentTab = 'students';
+let compareAuto = true;           // 비교 기준일을 '이전 등교일'로 자동 설정 중인가
 
 /* ═══ 라우팅 ═══ */
 function autoRoute() {
@@ -93,7 +94,9 @@ function createClass() {
 
 /* ═══ 반 화면 ═══ */
 function openClass(c) {
-  currentClass = c;
+  currentClass = Object.assign({ offDays: [] }, c);
+  compareAuto = true;
+  $('compareDate1').value = ''; $('compareDate2').value = '';
   App.only('teacherClass');
   $('tClassName').textContent = c.name;
   $('tClassCode').textContent = c.code;
@@ -214,19 +217,77 @@ function loadRanking() {
     .catch(() => App.renderRankingTable('tRankingBody', [], '불러오기 실패'));
 }
 
+/* ── 비교 날짜: 대상일은 오늘, 기준일은 그 앞의 '이전 등교일'을 자동으로 잡는다.
+ *    기준일을 손으로 고치면 자동을 멈추고, '자동으로' 버튼을 누르면 다시 켠다. */
+function offDays() { return (currentClass && currentClass.offDays) || []; }
+
 function initCompareDates() {
-  const today = new Date(), yest = new Date(Date.now() - 86400000);
-  if (!$('compareDate2').value) $('compareDate2').value = DB.dateKey(today);
-  if (!$('compareDate1').value) $('compareDate1').value = DB.dateKey(yest);
-  $('compareDate1').max = DB.dateKey(today);
-  $('compareDate2').max = DB.dateKey(today);
+  const todayKey = DB.dateKey(new Date());
+  if (!$('compareDate2').value) $('compareDate2').value = todayKey;
+  $('compareDate1').max = todayKey;
+  $('compareDate2').max = todayKey;
+  if (compareAuto) applyAutoBaseline();
+  renderOffDays();
   updateCompareHeaders();
+}
+
+function applyAutoBaseline() {
+  const d2 = $('compareDate2').value || DB.dateKey(new Date());
+  const prev = SchoolDay.prevSchoolDay(d2, offDays());
+  if (prev) $('compareDate1').value = prev;
+}
+
+function compareDateChanged(which) {
+  if (which === 1) compareAuto = false;
+  else if (compareAuto) applyAutoBaseline();
+  updateCompareHeaders();
+}
+
+function setCompareAuto() {
+  compareAuto = true;
+  applyAutoBaseline();
+  updateCompareHeaders();
+  loadComparison();
 }
 
 function updateCompareHeaders() {
   const f = s => { if (!s) return '—'; const p = s.split('-'); return `${+p[1]}/${+p[2]}`; };
-  $('compareHeader1').textContent = `${f($('compareDate1').value)} 최고`;
-  $('compareHeader2').textContent = `${f($('compareDate2').value)} 최고`;
+  const d1 = $('compareDate1').value, d2 = $('compareDate2').value;
+  $('compareHeader1').textContent = `${f(d1)} 최고`;
+  $('compareHeader2').textContent = `${f(d2)} 최고`;
+  const hint = $('compareHint');
+  if (!hint) return;
+  const parts = [];
+  if (compareAuto) {
+    parts.push(`<span>기준일 <b class="text-slate-700">${SchoolDay.label(d1)}</b> = ${SchoolDay.label(d2)}의 이전 등교일 (자동)</span>`);
+  } else {
+    parts.push(`<span>기준일을 직접 골랐습니다.</span>
+      <button type="button" class="px-2 py-0.5 rounded-md border border-slate-300 bg-white font-bold text-slate-600 hover:bg-slate-100" onclick="Teacher.setCompareAuto()">↺ 이전 등교일로 자동</button>`);
+  }
+  const why2 = SchoolDay.whyOff(d2, offDays());
+  if (why2) parts.push(`<span class="text-amber-600 font-bold">${SchoolDay.label(d2)}은 ${why2}이라 등교일이 아닙니다.</span>`);
+  hint.innerHTML = parts.join('');
+}
+
+/* ── 등교 안 하는 날 (반 설정, Firestore classes/{code}.offDays) ── */
+function renderOffDays() {
+  const list = offDays();
+  $('offDaysCount').textContent = list.length ? `· ${list.length}일 등록` : '';
+  if (document.activeElement !== $('offDaysText')) $('offDaysText').value = list.join('\n');
+}
+
+function saveOffDays() {
+  const msg = $('offDaysMessage');
+  msg.className = 'text-sm font-bold text-gray-500'; msg.textContent = '저장 중...';
+  DB.setOffDays(currentClass.code, $('offDaysText').value).then(list => {
+    currentClass.offDays = list;
+    msg.className = 'text-sm font-bold text-emerald-600'; msg.textContent = `저장했습니다 (${list.length}일)`;
+    setTimeout(() => msg.textContent = '', 3000);
+    renderOffDays();
+    if (compareAuto) applyAutoBaseline();
+    updateCompareHeaders();
+    loadComparison();
+  }).catch(e => { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = '저장 실패: ' + (e.message || ''); });
 }
 
 function loadComparison() {
@@ -328,6 +389,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadComparison, updateCompareHeaders, printCards
+  saveStudent, bulkImport, clearRecords, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, printCards
 };
 })();
