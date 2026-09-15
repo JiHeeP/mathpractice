@@ -20,8 +20,8 @@ const PAL = [
   { bg:'#eff6ff', bd:'#bfdbfe', badge:'#dbeafe', tx:'#1d4ed8' }
 ];
 const ROW_LABELS = {
-  orig:'문제', improper:'가분수로', flip:'곱셈으로', common:'통분',
-  calc:'계산', reduce:'약분', answer:'답'
+  orig:'문제', improper:'가분수로', flip:'곱셈으로', common:'통분', split:'따로 곱하기',
+  calc:'계산', reduce:'약분', part:'분수 부분', answer:'답'
 };
 
 let level, cfg, prob, steps, idx, probOK, waiting, rows;
@@ -139,16 +139,18 @@ const stepMixed = (desc, q, exp, fn) => ({ type:'mixed', desc, q, exp, fn });
 const stepYN    = (desc, q, exp, fn) => ({ type:'yn',    desc, q, exp, fn });
 const stepAuto  = (desc, msg, fn)    => ({ type:'auto',  desc, msg, fn });
 
-/** 약분 단계 (마지막에 reduce 줄을 채운다) */
-function pushReduce(raw) {
+/** 약분 단계 (마지막에 reduce 줄을 채운다)
+ *  show(red) 를 주면 reduce 줄에 그 HTML 을 대신 채운다 (L24 처럼 "8 + 4/3" 꼴로 보여 줄 때) */
+function pushReduce(raw, show) {
   const g = gcd(raw.n, raw.d);
   const red = reduce(raw);
+  const paint = () => fill('reduce', show ? show(red) : fracHTML(red));
   steps.push(stepYN('약분 확인', `${fracHTML(raw)}${fracJosa(raw, '을', '를')} 약분할 수 있나요?`, g > 1));
   if (g > 1) {
     steps.push(stepNum('최대공약수 구하기', `${raw.n}${josa(raw.n, '과', '와')} ${raw.d}의 최대공약수는?`, g));
-    steps.push(stepFrac('약분하기', `분자와 분모를 각각 ${g} 로 나누면?`, red, () => fill('reduce', fracHTML(red))));
+    steps.push(stepFrac('약분하기', `분자와 분모를 각각 ${g} 로 나누면?`, red, paint));
   } else {
-    steps.push(stepAuto('약분 확인', '더 이상 약분할 수 없어요 — 이미 기약분수!', () => fill('reduce', fracHTML(red))));
+    steps.push(stepAuto('약분 확인', '더 이상 약분할 수 없어요 — 이미 기약분수!', paint));
   }
   return red;
 }
@@ -188,6 +190,7 @@ function buildSteps() {
   steps = [];
 
   if (p.op === 'convert') return buildConvertSteps(p);
+  if (/-mul-nat/.test(p.op)) return buildMulNatSteps(p);
 
   const isMixedLevel = !!p.mixedInput;
   const isDiv  = false;                      // 나눗셈 과정 레벨은 현재 커리큘럼에 없음
@@ -242,6 +245,64 @@ function buildSteps() {
 
   /* ④ 대분수로 되돌리기 — 대분수 레벨이거나 답이 1을 넘으면 */
   if (isMixedLevel || isImproper(red)) {
+    rows.push('answer');
+    steps.push(stepMixed('대분수로 나타내기', `${fracHTML(red)}${fracJosa(red, '을', '를')} 대분수로 고치면?`, red,
+      () => fill('answer', mixedHTML(red))));
+    prob.answerIsMixed = true;
+  }
+  prob.answer = red;
+}
+
+/* ═══ 분수 × 자연수 (L23 · L24 · L25) ═══
+ *   frac-mul-nat            진분수 × 자연수 — 분자 × 자연수 → 약분 → 대분수
+ *   mixed-mul-nat-split     대분수 × 자연수 ① — 자연수 부분·분수 부분을 따로 곱해서 더하기
+ *   mixed-mul-nat-improper  대분수 × 자연수 ② — 가분수로 고쳐서 분자 × 자연수
+ */
+function buildMulNatSteps(p) {
+  const k = p.k;
+  const times = html => `${html}<span class="q-op">×</span><span class="fr-int">${k}</span>`;
+  const plus  = (a, b) => `<span class="fr-int">${a}</span><span class="q-op">+</span>${b}`;
+
+  if (p.op === 'mixed-mul-nat-split') {
+    const m = toMixed(p.A);                            // 정수부 w · 분수부 n/d
+    const w = m.w, part = F(m.n, m.d);
+    const wk = w * k, raw = F(m.n * k, m.d);
+    const grp = html => `<span class="wb-grp">(${html})</span>`;   // 줄바꿈되지 않는 괄호 묶음
+    rows = ['orig', 'split', 'calc', 'reduce'];
+    if (isImproper(raw)) rows.push('part');
+    rows.push('answer');
+    steps.push(stepAuto('따로 곱하기', `자연수 부분 <b>${w}</b>${josa(w, '과', '와')} 분수 부분 ${fracHTML(part)}${fracJosa(part, '을', '를')} 따로 ${k}${josa(k, '과', '와')} 곱해요`,
+      () => { fill('split', `${grp(times(`<span class="fr-int">${w}</span>`))}<span class="q-op">+</span>${grp(times(fracHTML(part)))}`);
+              fill('calc', plus('?', slot('?', m.d))); }));
+    steps.push(stepNum('자연수 부분 곱하기', `먼저 자연수 부분 <b>${w} × ${k}</b> = ?`, wk,
+      () => fill('calc', plus(wk, slot('?', m.d)))));
+    steps.push(stepNum('분수 부분 곱하기', `분수 부분은 분모를 그대로 두고 <b>${m.n} × ${k}</b> = ?`, m.n * k,
+      () => fill('calc', plus(wk, fracHTML(raw)))));
+    const red = pushReduce(raw, r => plus(wk, fracHTML(r)));
+    if (isImproper(red)) {
+      steps.push(stepMixed('분수 부분을 대분수로', `${fracHTML(red)}${fracJosa(red, '을', '를')} 대분수로 고치면?`, red,
+        () => fill('part', plus(wk, mixedHTML(red)))));
+    }
+    const ans = FR.add(F(wk, 1), red);
+    steps.push(stepMixed('자연수 부분과 더하기', `${plus(wk, mixedHTML(red))} = ?`, ans,
+      () => fill('answer', mixedHTML(ans))));
+    prob.answer = ans; prob.answerIsMixed = true;
+    return;
+  }
+
+  let A = p.A;
+  rows = ['orig'];
+  if (p.op === 'mixed-mul-nat-improper') {
+    rows.push('improper');
+    steps.push(stepFrac('가분수로 고치기', `${mixedHTML(p.A)}${mixedJosa(p.A, '을', '를')} 가분수로 고치면?`, p.A,
+      () => fill('improper', times(fracHTML(p.A)))));
+  }
+  rows.push('calc', 'reduce');
+  const raw = F(A.n * k, A.d);
+  steps.push(stepNum('분자 × 자연수', `분모는 그대로 두고 <b>${A.n} × ${k}</b> = ?`, raw.n,
+    () => fill('calc', fracHTML(raw))));
+  const red = pushReduce(raw);
+  if (p.mixedInput || isImproper(red)) {
     rows.push('answer');
     steps.push(stepMixed('대분수로 나타내기', `${fracHTML(red)}${fracJosa(red, '을', '를')} 대분수로 고치면?`, red,
       () => fill('answer', mixedHTML(red))));
@@ -444,5 +505,9 @@ function onProbDone() {
     </div>`;
 }
 
-return { init, submit, answerYN, next };
+/** 테스트 전용 — 지금 단계(종류 · 정답 · 이름)와 문제 */
+function debugStep() { const s = steps[idx]; return s ? { type: s.type, exp: s.exp, desc: s.desc, idx, total: steps.length } : null; }
+function debugProblem() { return prob; }
+
+return { init, submit, answerYN, next, debugStep, debugProblem };
 })();
