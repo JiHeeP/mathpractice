@@ -26,7 +26,7 @@ service cloud.firestore {
         && d.incorrect is number && d.incorrect >= 0 && d.incorrect <= 1000
         && d.durationSec is number && d.durationSec >= 0
         && d.ts is number
-        && (d.score == null || (d.score is number && d.score >= 0 && d.score <= 200));
+        && (d.score == null || (d.score is number && d.score >= 0 && d.score <= 300));   // L27 만점 220
     }
 
     function validLog() {

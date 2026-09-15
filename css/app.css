@@ -13,6 +13,7 @@
 .wb-body{flex:1;font-size:1.5rem;font-weight:800;color:#1f2937;display:flex;align-items:center;flex-wrap:wrap}
 .wb-body.wb-empty{color:#d1d5db;font-size:1.25rem}
 .wb-hint{font-size:1rem;color:#9ca3af;font-weight:700}
+.wb-grp{display:inline-flex;align-items:center;white-space:nowrap}
 .wb-filled{animation:pop .3s ease}
 @media(max-width:420px){.wb-body{font-size:1.25rem}.wb-label{flex-basis:3.4rem}}
 
