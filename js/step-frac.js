@@ -140,7 +140,7 @@ const stepYN    = (desc, q, exp, fn) => ({ type:'yn',    desc, q, exp, fn });
 const stepAuto  = (desc, msg, fn)    => ({ type:'auto',  desc, msg, fn });
 
 /** 약분 단계 (마지막에 reduce 줄을 채운다)
- *  show(red) 를 주면 reduce 줄에 그 HTML 을 대신 채운다 (L24 처럼 "8 + 4/3" 꼴로 보여 줄 때) */
+ *  show(red) 를 주면 reduce 줄에 그 HTML 을 대신 채운다 (L25 처럼 "8 + 4/3" 꼴로 보여 줄 때) */
 function pushReduce(raw, show) {
   const g = gcd(raw.n, raw.d);
   const red = reduce(raw);
@@ -253,7 +253,7 @@ function buildSteps() {
   prob.answer = red;
 }
 
-/* ═══ 분수 × 자연수 (L23 · L24 · L25) ═══
+/* ═══ 분수 × 자연수 (L23 · L25 · L26) ═══
  *   frac-mul-nat            진분수 × 자연수 — 분자 × 자연수 → 약분 → 대분수
  *   mixed-mul-nat-split     대분수 × 자연수 ① — 자연수 부분·분수 부분을 따로 곱해서 더하기
  *   mixed-mul-nat-improper  대분수 × 자연수 ② — 가분수로 고쳐서 분자 × 자연수

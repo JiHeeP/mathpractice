@@ -339,20 +339,36 @@ function compareEntries(a, b) {
   return String(a.studentNo).localeCompare(String(b.studentNo));
 }
 
+/** 랭킹 — 학생마다 레벨별 최고 점수를 모두 더한 '합계 점수' 순.
+ *  같은 L22 라도 먼저 푼 순서가 아니라 L1~Ln 최고점 합이 큰 학생이 위로 온다.
+ *  합계가 같으면 더 높은 레벨까지 간 학생, 그다음은 마지막 기록이 이른 학생.
+ */
 async function getRanking(code, limit) {
   const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
   const names = {};
   students.forEach(s => names[String(s.number)] = s.name);
-  const best = {};
+  const by = {};
   rows.forEach(r => {
     const score = scoreOf(r);
     if (score === null) return;
     const no = String(r.studentNo);
-    const e = { studentNo:no, name:names[no] || `학생 ${no}`, level:r.level, score, ts:r.ts };
-    if (!best[no] || compareEntries(e, best[no]) < 0) best[no] = e;
+    const e = by[no] = by[no] || { studentNo:no, name:names[no] || `학생 ${no}`, best:{}, lastTs:0 };
+    if (!e.best[r.level] || score > e.best[r.level]) e.best[r.level] = score;
+    if (r.ts > e.lastTs) e.lastTs = r.ts;
   });
-  const ranked = Object.values(best).sort(compareEntries)
-    .map((it, i) => ({ rank:`${i + 1}등`, name:it.name, level:it.level, score:it.score }));
+  const entries = Object.values(by).map(e => {
+    const levels = Object.keys(e.best);
+    const total = levels.reduce((sum, lv) => sum + e.best[lv], 0);
+    const top = levels.reduce((a, b) => (levelWeight(b) > levelWeight(a) ? b : a), levels[0]);
+    return { studentNo:e.studentNo, name:e.name, total:parseFloat(total.toFixed(1)), level:top, levels:levels.length, ts:e.lastTs };
+  });
+  entries.sort((a, b) => {
+    let d = b.total - a.total;                         if (d) return d;
+    d = levelWeight(b.level) - levelWeight(a.level);   if (d) return d;
+    d = a.ts - b.ts;                                   if (d) return d;
+    return String(a.studentNo).localeCompare(String(b.studentNo));
+  });
+  const ranked = entries.map((it, i) => ({ rank:`${i + 1}등`, name:it.name, level:it.level, levels:it.levels, score:it.total }));
   return limit ? ranked.slice(0, limit) : ranked;
 }
 

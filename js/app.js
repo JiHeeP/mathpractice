@@ -283,7 +283,7 @@ function renderChart(hist) {
   });
 }
 
-/** 순위 표 렌더 (교사 화면에서도 재사용) */
+/** 순위 표 렌더 (교사 화면에서도 재사용) — 점수는 레벨별 최고점의 합계, 레벨은 도달한 최고 레벨 */
 function renderRankingTable(tbodyId, list, emptyMsg) {
   const tb = $(tbodyId);
   tb.innerHTML = '';
@@ -295,7 +295,7 @@ function renderRankingTable(tbodyId, list, emptyMsg) {
     tr.innerHTML = `<td class="px-4 py-3 text-center font-bold text-gray-700">${medal}</td>
       <td class="px-4 py-3 font-medium text-gray-900">${it.name}</td>
       <td class="px-4 py-3 text-center"><span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">${it.level}</span></td>
-      <td class="px-4 py-3 text-right font-bold text-orange-600">${it.score}</td>`;
+      <td class="px-4 py-3 text-right font-bold text-orange-600">${it.score}<div class="text-xs font-normal text-gray-400">${it.levels}개 레벨</div></td>`;
     tb.appendChild(tr);
   });
 }
