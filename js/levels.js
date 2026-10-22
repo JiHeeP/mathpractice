@@ -1,12 +1,14 @@
-/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (27레벨: 분수·소수·분수의 곱셈) */
+/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (28레벨: 분수·소수·분수의 곱셈) */
 
-const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L10','L11',
+const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L9-2','L10','L11',
                      'L12','L13','L14','L15','L16','L17','L18','L19','L20','L21','L22',
                      'L23','L24','L25','L26','L27'];
 
-/** 레벨별 만점 — L1 90점부터 레벨당 +5 (L27 = 220) */
+/** 레벨별 만점 — L1 90점부터 레벨당 +5 (L27 = 220)
+ *  L9-2 는 나중에 끼워 넣은 레벨이라 기존 기록(레벨 번호·만점)을 건드리지 않도록 L9 와 L10 사이 값(133)으로 고정 */
 const LEVEL_MAX = {};
-LEVEL_ORDER.forEach((lv, i) => { LEVEL_MAX[lv] = 90 + i * 5; });
+LEVEL_ORDER.filter(lv => lv !== 'L9-2').forEach((lv, i) => { LEVEL_MAX[lv] = 90 + i * 5; });
+LEVEL_MAX['L9-2'] = 133;
 
 /** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
 const PRACTICE_MODES = ['free', 'step_free', 'free_choice', 'aborted'];
@@ -60,6 +62,9 @@ const LEVEL_CONFIGS = {
   L9:  { group:'common',  engine:'choice', type:'lcm',        chalQ:20, chalTime:T(20,15),
          label:'최소공배수 구하기', desc:'통분의 준비 운동',
          theme:{bg:'bg-teal-50',   border:'border-teal-200',   hbg:'hover:bg-teal-100',   lbl:'text-teal-800',   descCls:'text-teal-600'} },
+  'L9-2': { group:'common', engine:'choice', type:'lcm-convert',chalQ:20, chalTime:T(20,18),
+         label:'최소공배수로 통분 연습', desc:'공통분모가 정해졌을 때 분자 구하기',
+         theme:{bg:'bg-teal-50',   border:'border-teal-300',   hbg:'hover:bg-teal-100',   lbl:'text-teal-900',   descCls:'text-teal-700'} },
   L10: { group:'common',  engine:'choice', type:'common-denom',chalQ:20, chalTime:T(20,18),
          label:'분수 통분하기', desc:'최소공배수를 공통분모로',
          theme:{bg:'bg-teal-50',   border:'border-teal-300',   hbg:'hover:bg-teal-100',   lbl:'text-teal-900',   descCls:'text-teal-700'} },

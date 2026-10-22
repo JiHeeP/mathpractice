@@ -1,4 +1,4 @@
-/* generator.js — 27레벨 문제 생성
+/* generator.js — 28레벨 문제 생성
  * 4지선다 문제는 { display, choices:[{html, key, correct, near}] } 형태로 만든다.
  *   - correct: 정답 보기 표시
  *   - near   : 값은 맞지만 형태가 틀린 보기(약분 안 함, 최소공배수 아님 등)에 붙는 안내문
@@ -503,7 +503,7 @@ function mixedMulNatQuestion(p) {
   };
 }
 
-/* ═══════════ L9 최소공배수 · L10 통분 ═══════════ */
+/* ═══════════ L9 최소공배수 · L9-2 최소공배수 통분 연습 · L10 통분 ═══════════ */
 
 function genLcm() {
   let a, b;
@@ -515,6 +515,33 @@ function genLcm() {
   return {
     display: eqQ(`<span class="qc-num">${a}</span><span class="q-mid">${window.Frac.josa(a,'과','와')}</span><span class="qc-num">${b}</span><span class="q-mid">의 최소공배수</span>`),
     choices: finalize(intC(L, true), cands, () => { const v = L + pick([-2,-1,1,2,3]) * randInt(1,3); return v > 1 && v !== L ? intC(v, false) : null; })
+  };
+}
+
+/** 최소공배수 통분 연습 (L9-2) — 최소공배수는 알려 주고, 한 분수의 새 분자 구하기 */
+function genLcmConvert() {
+  let b, d;
+  do { [b, d] = pickTwoDenoms(48); } while (lcm(b, d) === b * d && Math.random() < 0.7);
+  const L = lcm(b, d);
+  const fromB = Math.random() < 0.5;
+  const den = fromB ? b : d, other = fromB ? d : b;
+  const a = coprimeNumer(den), k = L / den, x = a * k;
+  const cands = [
+    fracC(F(a, L), false),                                          // 분자를 안 바꿈
+    fracC(F(a * (L / other), L), false),                            // 다른 분수의 배수를 곱함
+    fracC(F(a * (k + 1), L), false),                                // 곱하는 수를 잘못 셈
+    k > 1 ? fracC(F(a * (k - 1), L), false) : null,
+    fracC(F(a + k, L), false)                                       // 곱하지 않고 더함
+  ].filter(c => c && c.key !== 'f' + fracText(F(x, L)));
+  const c = coprimeNumer(other);
+  const fa = F(a, den), fo = F(c, other);
+  const [f1, f2] = fromB ? [fa, fo] : [fo, fa];
+  return {
+    display: `<div class="pic-cap mb-2">최소공배수를 공통분모로 통분해요 → 공통분모 <b>${L}</b></div>` +
+             `${fracHTML(f1)}<span class="pair-sep">${window.Frac.fracJosa(f1,'과','와')}</span>${fracHTML(f2)}` +
+             `<div class="pic-cap my-2">${fromB ? '앞' : '뒤'}의 분수를 분모가 <b>${L}</b>인 분수로 바꾸면?</div>` +
+             `${fracHTML(fa)}<span class="q-op">=</span><span class="text-gray-300">?</span>`,
+    choices: finalize(fracC(F(x, L), true), cands, () => fracC(F(x + randInt(1, 3), L), false))
   };
 }
 
@@ -593,6 +620,7 @@ const CHOICE_GENS = {
   'same-add':    () => sameDenomCalcQuestion(genSameAdd()),
   'same-sub':    () => sameDenomCalcQuestion(genSameSub()),
   'lcm':         genLcm,
+  'lcm-convert': genLcmConvert,
   'common-denom':genCommonDenom,
   'diff-add1':   () => mixedCalcQuestion(genDiffAdd1()),
   'diff-sub':    () => properCalcQuestion(genDiffSub()),
