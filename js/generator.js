@@ -518,40 +518,12 @@ function genLcm() {
   };
 }
 
-/** 최소공배수 통분 연습 (L9-2) — 최소공배수는 알려 주고, 한 분수의 새 분자 구하기 */
-function genLcmConvert() {
-  let b, d;
-  do { [b, d] = pickTwoDenoms(48); } while (lcm(b, d) === b * d && Math.random() < 0.7);
-  const L = lcm(b, d);
-  const fromB = Math.random() < 0.5;
-  const den = fromB ? b : d, other = fromB ? d : b;
-  const a = coprimeNumer(den), k = L / den, x = a * k;
-  const cands = [
-    fracC(F(a, L), false),                                          // 분자를 안 바꿈
-    fracC(F(a * (L / other), L), false),                            // 다른 분수의 배수를 곱함
-    fracC(F(a * (k + 1), L), false),                                // 곱하는 수를 잘못 셈
-    k > 1 ? fracC(F(a * (k - 1), L), false) : null,
-    fracC(F(a + k, L), false)                                       // 곱하지 않고 더함
-  ].filter(c => c && c.key !== 'f' + fracText(F(x, L)));
-  const c = coprimeNumer(other);
-  const fa = F(a, den), fo = F(c, other);
-  const [f1, f2] = fromB ? [fa, fo] : [fo, fa];
-  return {
-    display: `<div class="pic-cap mb-2">최소공배수를 공통분모로 통분해요 → 공통분모 <b>${L}</b></div>` +
-             `${fracHTML(f1)}<span class="pair-sep">${window.Frac.fracJosa(f1,'과','와')}</span>${fracHTML(f2)}` +
-             `<div class="pic-cap my-2">${fromB ? '앞' : '뒤'}의 분수를 분모가 <b>${L}</b>인 분수로 바꾸면?</div>` +
-             `${fracHTML(fa)}<span class="q-op">=</span><span class="text-gray-300">?</span>`,
-    choices: finalize(fracC(F(x, L), true), cands, () => fracC(F(x + randInt(1, 3), L), false))
-  };
-}
-
 const pairC = (f1, f2, correct, near) =>
   C(`${fracHTML(f1)}<span class="pair-sep">${window.Frac.fracJosa(f1,'과','와')}</span>${fracHTML(f2)}`,
     'p' + fracText(f1) + '|' + fracText(f2), correct, near);
 
-function genCommonDenom() {
-  const [b, d] = pickTwoDenoms(48);
-  const a = coprimeNumer(b), c = coprimeNumer(d);
+/** 통분 결과 보기 4개 (정답: 최소공배수로 통분한 한 쌍) — L10 4지선다와 L9-2 마지막 단계가 함께 쓴다 */
+function commonDenomChoices(a, b, c, d) {
   const L = lcm(b, d), x = a * (L / b), y = c * (L / d);
   const cands = [
     pairC(F(a, L), F(c, L), false),                                  // 분자를 안 바꿈
@@ -560,12 +532,26 @@ function genCommonDenom() {
       '통분은 맞아요! 하지만 <b>최소공배수</b>로 통분한 것을 골라야 해요') : null,
     pairC(F(x, L), F(c, L), false)                                   // 한쪽만 바꿈
   ].filter(Boolean);
+  return finalize(pairC(F(x, L), F(y, L), true), cands,
+    () => pairC(F(x + randInt(1, 3), L), F(y, L), false));
+}
+
+function genCommonDenom() {
+  const [b, d] = pickTwoDenoms(48);
+  const a = coprimeNumer(b), c = coprimeNumer(d);
   return {
     display: `<div class="pic-cap mb-2">두 분수를 <b>최소공배수</b>로 통분하면?</div>` +
              `${fracHTML(F(a, b))}<span class="pair-sep">${window.Frac.fracJosa(F(a,b),'과','와')}</span>${fracHTML(F(c, d))}`,
-    choices: finalize(pairC(F(x, L), F(y, L), true), cands,
-      () => pairC(F(x + randInt(1, 3), L), F(y, L), false))
+    choices: commonDenomChoices(a, b, c, d)
   };
+}
+
+/** 통분 과정 연습 (L9-2) — 분모가 서로소가 아닌 짝을 자주 내서 '최소공배수 ≠ 분모의 곱'을 느끼게 한다 */
+function genCommonSteps() {
+  let b, d;
+  do { [b, d] = pickTwoDenoms(48); } while (gcd(b, d) === 1 && Math.random() < 0.7);
+  const a = coprimeNumer(b), c = coprimeNumer(d);
+  return { op:'common-steps', A:F(a, b), B:F(c, d), sign:'+', choices: commonDenomChoices(a, b, c, d) };
 }
 
 /* ═══════════ L19~L22 소수 계산 ═══════════ */
@@ -620,7 +606,6 @@ const CHOICE_GENS = {
   'same-add':    () => sameDenomCalcQuestion(genSameAdd()),
   'same-sub':    () => sameDenomCalcQuestion(genSameSub()),
   'lcm':         genLcm,
-  'lcm-convert': genLcmConvert,
   'common-denom':genCommonDenom,
   'diff-add1':   () => mixedCalcQuestion(genDiffAdd1()),
   'diff-sub':    () => properCalcQuestion(genDiffSub()),
@@ -645,6 +630,7 @@ function generateChoiceSet(level, count) {
 function generateStepProblem(level) {
   const cfg = window.Levels.LEVEL_CONFIGS[level];
   switch (cfg.op) {
+    case 'common-steps': return genCommonSteps();
     case 'diff-add1': return genDiffAdd1();
     case 'diff-sub':  return genDiffSub();
     case 'mixed-add': return genMixedCalc(true);

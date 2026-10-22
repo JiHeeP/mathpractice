@@ -128,6 +128,7 @@ function origHTML() {
       ? `${fracHTML(p.improper)} <span class="q-op">→</span> <span class="wb-hint">대분수</span>`
       : `${mixedHTML(p.improper)} <span class="q-op">→</span> <span class="wb-hint">가분수</span>`;
   }
+  if (p.op === 'common-steps') return `${fracHTML(p.A)}<span class="pair-sep">${josa(p.A.n, '과', '와')}</span>${fracHTML(p.B)}`;
   const show = p.mixedInput ? mixedHTML : fracHTML;
   return `${show(p.A)}<span class="q-op">${p.sign}</span>${show(p.B)}`;
 }
@@ -138,6 +139,8 @@ const stepFrac  = (desc, q, exp, fn) => ({ type:'frac',  desc, q, exp, fn });
 const stepMixed = (desc, q, exp, fn) => ({ type:'mixed', desc, q, exp, fn });
 const stepYN    = (desc, q, exp, fn) => ({ type:'yn',    desc, q, exp, fn });
 const stepAuto  = (desc, msg, fn)    => ({ type:'auto',  desc, msg, fn });
+/** 보기 고르기 — choices 는 Gen 의 {html, correct, near} 목록 */
+const stepPick  = (desc, q, choices, fn) => ({ type:'pick', desc, q, choices, exp: choices.findIndex(c => c.correct), fn });
 
 /** 약분 단계 (마지막에 reduce 줄을 채운다)
  *  show(red) 를 주면 reduce 줄에 그 HTML 을 대신 채운다 (L25 처럼 "8 + 4/3" 꼴로 보여 줄 때) */
@@ -191,6 +194,7 @@ function buildSteps() {
 
   if (p.op === 'convert') return buildConvertSteps(p);
   if (/-mul-nat/.test(p.op)) return buildMulNatSteps(p);
+  if (p.op === 'common-steps') return buildCommonSteps(p);
 
   const isMixedLevel = !!p.mixedInput;
   const isDiv  = false;                      // 나눗셈 과정 레벨은 현재 커리큘럼에 없음
@@ -311,6 +315,36 @@ function buildMulNatSteps(p) {
   prob.answer = red;
 }
 
+/* ═══ 통분 과정 (L9-2) ═══
+ *   1 최소공배수 → 2 첫째 분수 (분모 × □, 분자 × □) → 3 둘째 분수 → 4 통분한 값 고르기 */
+function buildCommonSteps(p) {
+  const { A, B } = p;
+  const L = lcm(A.d, B.d), k1 = L / A.d, k2 = L / B.d;
+  const times = (n, k) => `${n}<span class="q-op">×</span>${k}`;
+  const part = (f, k) => k === null ? fracHTML(f) : slot(times(f.n, k), times(f.d, k));
+  const sep = (f1, f2) => `${f1}<span class="pair-sep">${fracJosa(A, '과', '와')}</span>${f2}`;
+  const board = (h1, h2) => fill('common', sep(h1, h2));
+  rows = ['orig', 'common', 'answer'];
+
+  steps.push(stepNum('최소공배수 구하기', `분모 ${A.d}${josa(A.d, '과', '와')} ${B.d}의 최소공배수는?`, L,
+    () => board(slot('?', L), slot('?', L))));
+
+  [[A, k1, '첫째', 1], [B, k2, '둘째', 2]].forEach(([f, k, nth, no]) => {
+    const draw = (h) => no === 1 ? board(h, fracHTML(B)) : board(part(A, k1), h);
+    steps.push(stepNum(`${nth} 분수 — 분모`,
+      `${fracHTML(f)}의 분모 ${f.d}${josa(f.d, '을', '를')} ${L}로 바꾸려면 분모에 <b>× ( ? )</b>`, k,
+      () => draw(slot(`${f.n}<span class="q-op">×</span>?`, times(f.d, k)))));
+    steps.push(stepNum(`${nth} 분수 — 분자`,
+      `분모에 ${k}${josa(k, '을', '를')} 곱했으니 분자에도 <b>× ( ? )</b>`, k,
+      () => draw(part(f, k))));
+  });
+
+  const x = A.n * k1, y = B.n * k2;
+  steps.push(stepPick('통분한 값 고르기', '최소공배수로 통분한 두 분수는?', p.choices,
+    () => fill('answer', sep(fracHTML(F(x, L)), fracHTML(F(y, L))))));
+  prob.answer = F(x, L); prob.pair = [F(x, L), F(y, L)];
+}
+
 function buildConvertSteps(p) {
   const imp = p.improper, m = toMixed(imp);
   if (p.dir === 'toMixed') {
@@ -348,6 +382,10 @@ function inputHTML(type) {
       <button class="yn-btn yn-yes" onclick="StepFrac.answerYN(true)">⭕ 예</button>
       <button class="yn-btn yn-no" onclick="StepFrac.answerYN(false)">❌ 아니오</button>
     </div>`;
+  }
+  if (type === 'pick') {
+    return `<div class="grid grid-cols-2 gap-3">${steps[idx].choices.map((c, i) =>
+      `<button class="quiz-choice" onclick="StepFrac.answerPick(${i})">${c.html}</button>`).join('')}</div>`;
   }
   const box = (id, ph) => `<input type="text" inputmode="numeric" id="${id}" placeholder="${ph}" class="fi-box" autocomplete="off"/>`;
   if (type === 'num') {
@@ -408,7 +446,7 @@ function showStep() {
     <div id="stepFb" class="min-h-8 mt-3 font-bold text-lg"></div>
   </div>`;
   startStepClock();
-  if (s.type !== 'yn') wireInputs(s.type);
+  if (s.type !== 'yn' && s.type !== 'pick') wireInputs(s.type);
 }
 
 /* ═══ 채점 ═══ */
@@ -463,7 +501,17 @@ function answerYN(v) {
   finishStep(v === s.exp, fb, s, null, true);
 }
 
-function finishStep(ok, fb, s, note, isYN) {
+function answerPick(i) {
+  if (waiting) return;
+  const s = steps[idx], fb = document.getElementById('stepFb');
+  document.querySelectorAll('#stepQArea .quiz-choice').forEach((b, j) => {
+    b.disabled = true;
+    if (j === s.exp) b.classList.add(i === j ? 'qc-right' : 'qc-answer'); else if (j === i) b.classList.add('qc-wrong');
+  });
+  finishStep(i === s.exp, fb, s, s.choices[i].near, false, true);
+}
+
+function finishStep(ok, fb, s, note, isYN, isPick) {
   waiting = true;
   const ms = Date.now() - stepStart;
   stopStepClock();
@@ -475,7 +523,7 @@ function finishStep(ok, fb, s, note, isYN) {
     setTimeout(() => { waiting = false; idx++; showStep(); }, 600);
   } else {
     probOK = false;
-    const answer = isYN ? `<b>${s.exp ? '예' : '아니오'}</b>` : expectedHTML(s.type, s.exp);
+    const answer = isPick ? '초록 테두리 보기' : isYN ? `<b>${s.exp ? '예' : '아니오'}</b>` : expectedHTML(s.type, s.exp);
     fb.innerHTML = `<span class="text-red-500">틀렸어요 ❌ 정답: ${answer}</span>` +
                    (note ? `<div class="text-sm text-amber-600 mt-1">${note}</div>` : '') + took;
     setTimeout(() => { waiting = false; idx++; showStep(); }, note ? 1800 : 1200);
@@ -494,7 +542,7 @@ function onProbDone() {
     return;
   }
   const p = prob;
-  const ansHTML = p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
+  const ansHTML = p.pair ? `${fracHTML(p.pair[0])}<span class="pair-sep">${josa(p.pair[0].n, '과', '와')}</span>${fracHTML(p.pair[1])}` : p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
   document.getElementById('stepQArea').innerHTML = `
     <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 text-center">
       <div class="text-4xl mb-2">${probOK ? '🎉' : '💪'}</div>
@@ -509,5 +557,5 @@ function onProbDone() {
 function debugStep() { const s = steps[idx]; return s ? { type: s.type, exp: s.exp, desc: s.desc, idx, total: steps.length } : null; }
 function debugProblem() { return prob; }
 
-return { init, submit, answerYN, next, debugStep, debugProblem };
+return { init, submit, answerYN, answerPick, next, debugStep, debugProblem };
 })();
