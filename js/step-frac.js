@@ -128,6 +128,7 @@ function origHTML() {
       ? `${fracHTML(p.improper)} <span class="q-op">→</span> <span class="wb-hint">대분수</span>`
       : `${mixedHTML(p.improper)} <span class="q-op">→</span> <span class="wb-hint">가분수</span>`;
   }
+  if (p.op === 'common-steps') return `${fracHTML(p.A)}<span class="pair-sep">${josa(p.A.n, '과', '와')}</span>${fracHTML(p.B)}`;
   const show = p.mixedInput ? mixedHTML : fracHTML;
   return `${show(p.A)}<span class="q-op">${p.sign}</span>${show(p.B)}`;
 }
@@ -138,6 +139,8 @@ const stepFrac  = (desc, q, exp, fn) => ({ type:'frac',  desc, q, exp, fn });
 const stepMixed = (desc, q, exp, fn) => ({ type:'mixed', desc, q, exp, fn });
 const stepYN    = (desc, q, exp, fn) => ({ type:'yn',    desc, q, exp, fn });
 const stepAuto  = (desc, msg, fn)    => ({ type:'auto',  desc, msg, fn });
+/** 학습지 한 줄 — a/b = a×□ / b×□ = □/□ 를 칸에 직접 채운다. exp = {k, n, d} */
+const stepRow   = (desc, q, f, exp, fn) => ({ type:'row',   desc, q, f, exp, fn });
 
 /** 약분 단계 (마지막에 reduce 줄을 채운다)
  *  show(red) 를 주면 reduce 줄에 그 HTML 을 대신 채운다 (L25 처럼 "8 + 4/3" 꼴로 보여 줄 때) */
@@ -191,6 +194,7 @@ function buildSteps() {
 
   if (p.op === 'convert') return buildConvertSteps(p);
   if (/-mul-nat/.test(p.op)) return buildMulNatSteps(p);
+  if (p.op === 'common-steps') return buildCommonSteps(p);
 
   const isMixedLevel = !!p.mixedInput;
   const isDiv  = false;                      // 나눗셈 과정 레벨은 현재 커리큘럼에 없음
@@ -311,6 +315,24 @@ function buildMulNatSteps(p) {
   prob.answer = red;
 }
 
+/* ═══ 통분 과정 (L9-2) ═══
+ *   1 최소공배수 → 2 첫째 분수 → 3 둘째 분수 (학습지처럼 a/b = a×□ / b×□ = □/□ 칸 채우기) */
+function buildCommonSteps(p) {
+  const { A, B } = p;
+  const L = lcm(A.d, B.d), k1 = L / A.d, k2 = L / B.d;
+  const x = A.n * k1, y = B.n * k2;
+  const sep = (h1, h2) => `${h1}<span class="pair-sep">${fracJosa(A, '과', '와')}</span>${h2}`;
+  rows = ['orig', 'common'];
+
+  steps.push(stepNum('최소공배수 구하기', `분모 ${A.d}${josa(A.d, '과', '와')} ${B.d}의 최소공배수는?`, L,
+    () => fill('common', sep(slot('?', L), slot('?', L)))));
+  steps.push(stepRow('첫째 분수 통분', `분모가 <b>${L}</b>${josa(L, "이", "가")} 되려면 분모와 분자에 각각 얼마를 곱할까요?`, A, { k: k1, n: x, d: L },
+    () => fill('common', sep(fracHTML(F(x, L)), slot('?', L)))));
+  steps.push(stepRow('둘째 분수 통분', `분모가 <b>${L}</b>${josa(L, "이", "가")} 되려면 분모와 분자에 각각 얼마를 곱할까요?`, B, { k: k2, n: y, d: L },
+    () => fill('common', sep(fracHTML(F(x, L)), fracHTML(F(y, L))))));
+  prob.pair = [F(x, L), F(y, L)];
+}
+
 function buildConvertSteps(p) {
   const imp = p.improper, m = toMixed(imp);
   if (p.dir === 'toMixed') {
@@ -350,6 +372,19 @@ function inputHTML(type) {
     </div>`;
   }
   const box = (id, ph) => `<input type="text" inputmode="numeric" id="${id}" placeholder="${ph}" class="fi-box" autocomplete="off"/>`;
+  if (type === 'row') {
+    const f = steps[idx].f;
+    const mini = id => `<input type="text" inputmode="numeric" id="${id}" class="fi-box fi-mini" autocomplete="off"/>`;
+    return `<div class="flex flex-wrap justify-center gap-3 items-center">
+      <div class="ws-row">
+        ${fracHTML(f)}<span class="q-op">=</span>
+        <span class="fr"><span class="fr-n">${f.n}<span class="q-op">×</span>${mini('fiA')}</span><span class="fr-d">${f.d}<span class="q-op">×</span>${mini('fiB')}</span></span>
+        <span class="q-op">=</span>
+        <div class="fi-frac">${box('fiN', '')}<div class="fi-bar"></div>${box('fiD', '')}</div>
+      </div>
+      <button onclick="StepFrac.submit()" class="btn-check">확인</button>
+    </div>`;
+  }
   if (type === 'num') {
     return `<div class="flex justify-center gap-3 items-center">
       ${box('fiNum', '')}
@@ -366,7 +401,7 @@ function inputHTML(type) {
 }
 
 function wireInputs(type) {
-  const order = type === 'num' ? ['fiNum'] : type === 'mixed' ? ['fiW','fiN','fiD'] : ['fiN','fiD'];
+  const order = type === 'num' ? ['fiNum'] : type === 'row' ? ['fiA','fiB','fiN','fiD'] : type === 'mixed' ? ['fiW','fiN','fiD'] : ['fiN','fiD'];
   order.forEach((id, i) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -419,6 +454,10 @@ function readValue(type) {
     if (!/^-?\d+$/.test(raw)) return null;
     return parseInt(raw, 10);
   }
+  if (type === 'row') {
+    const v = ['fiA','fiB','fiN','fiD'].map(id => (val(id) || '').trim());
+    return v.every(t => /^\d+$/.test(t)) ? { a: +v[0], b: +v[1], n: +v[2], d: +v[3] } : null;
+  }
   const n = (val('fiN') || '').trim(), d = (val('fiD') || '').trim();
   if (!/^\d+$/.test(n) || !/^[1-9]\d*$/.test(d)) return null;
   if (type === 'frac') return F(parseInt(n, 10), parseInt(d, 10));
@@ -429,6 +468,11 @@ function readValue(type) {
 
 function judge(type, got, exp) {
   if (type === 'num')  return { ok: got === exp };
+  if (type === 'row') {
+    const bad = [got.a !== exp.k, got.b !== exp.k, got.n !== exp.n, got.d !== exp.d];
+    ['fiA','fiB','fiN','fiD'].forEach((id, i) => document.getElementById(id).classList.add(bad[i] ? 'fi-bad' : 'fi-good'));
+    return { ok: !bad.some(Boolean), note: got.a !== got.b ? '분모와 분자에는 <b>같은 수</b>를 곱해요.' : null };
+  }
   if (type === 'frac') {
     if (eqExact(got, exp)) return { ok: true };
     if (eqValue(got, exp)) return { ok: false, note: '값은 맞아요! 하지만 <b>기약분수</b>로 약분해야 합니다.' };
@@ -444,6 +488,7 @@ function judge(type, got, exp) {
 
 function expectedHTML(type, exp) {
   if (type === 'num')  return `<b>${exp}</b>`;
+  if (type === 'row') return `× <b>${exp.k}</b> → ${fracHTML(F(exp.n, exp.d))}`;
   if (type === 'frac') return fracHTML(exp);
   return mixedHTML(exp);
 }
@@ -494,7 +539,7 @@ function onProbDone() {
     return;
   }
   const p = prob;
-  const ansHTML = p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
+  const ansHTML = p.pair ? `${fracHTML(p.pair[0])}<span class="pair-sep">${josa(p.pair[0].n, '과', '와')}</span>${fracHTML(p.pair[1])}` : p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
   document.getElementById('stepQArea').innerHTML = `
     <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 text-center">
       <div class="text-4xl mb-2">${probOK ? '🎉' : '💪'}</div>
