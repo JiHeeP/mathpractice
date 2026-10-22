@@ -551,7 +551,7 @@ function genCommonSteps() {
   let b, d;
   do { [b, d] = pickTwoDenoms(48); } while (gcd(b, d) === 1 && Math.random() < 0.7);
   const a = coprimeNumer(b), c = coprimeNumer(d);
-  return { op:'common-steps', A:F(a, b), B:F(c, d), sign:'+', choices: commonDenomChoices(a, b, c, d) };
+  return { op:'common-steps', A:F(a, b), B:F(c, d), sign:'+' };
 }
 
 /* ═══════════ L19~L22 소수 계산 ═══════════ */
