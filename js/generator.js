@@ -1,4 +1,4 @@
-/* generator.js — 28레벨 문제 생성
+/* generator.js — 37레벨 문제 생성
  * 4지선다 문제는 { display, choices:[{html, key, correct, near}] } 형태로 만든다.
  *   - correct: 정답 보기 표시
  *   - near   : 값은 맞지만 형태가 틀린 보기(약분 안 함, 최소공배수 아님 등)에 붙는 안내문
@@ -320,24 +320,55 @@ function genMixedCalc(isAdd) {
  * 답이 정수로 딱 떨어지면(2/3 × 3 = 2) 대분수 단계가 어색하므로 내지 않는다.
  */
 
-/** 진분수 × 자연수 (L23 과정 · L24 4지선다) */
-function genFracMulNat() {
+/** 진분수 × 자연수 (L23 과정 · L24 4지선다)
+ *  natFirst 이면 자연수 × 진분수 (L28 · L29) — 곱은 같고 보여 주는 순서만 바뀐다. A 에는 늘 분수를 담는다. */
+function genFracMulNat(natFirst) {
+  const nf = !!natFirst;
   for (let t = 0; t < 300; t++) {
     const d = randInt(2, 12), n = coprimeNumer(d), k = randInt(2, 9);
     if (isWhole(F(n * k, d))) continue;
-    return { op:'frac-mul-nat', A:F(n, d), B:F(k, 1), k, sign:'×' };
+    return { op:'frac-mul-nat', A:F(n, d), B:F(k, 1), k, sign:'×', natFirst:nf };
   }
-  return { op:'frac-mul-nat', A:F(3, 4), B:F(5, 1), k:5, sign:'×' };
+  return { op:'frac-mul-nat', A:F(3, 4), B:F(5, 1), k:5, sign:'×', natFirst:nf };
 }
 
-/** 대분수 × 자연수 (L25 따로 곱하기 · L26 가분수로 · L27 4지선다) */
-function genMixedMulNat(op) {
+/** 대분수 × 자연수 (L25 따로 곱하기 · L26 가분수로 · L27 4지선다)
+ *  natFirst 이면 자연수 × 대분수 (L30 · L31 · L32) */
+function genMixedMulNat(op, natFirst) {
+  const nf = !!natFirst;
   for (let t = 0; t < 300; t++) {
     const d = randInt(2, 10), n = coprimeNumer(d), w = randInt(1, 4), k = randInt(2, 8);
     if (isWhole(F(n * k, d))) continue;                 // 분수 부분의 곱이 정수가 되면 다시
-    return { op, A:fromMixed(w, n, d), B:F(k, 1), k, sign:'×', mixedInput:true };
+    return { op, A:fromMixed(w, n, d), B:F(k, 1), k, sign:'×', mixedInput:true, natFirst:nf };
   }
-  return { op, A:fromMixed(2, 1, 3), B:F(4, 1), k:4, sign:'×', mixedInput:true };
+  return { op, A:fromMixed(2, 1, 3), B:F(4, 1), k:4, sign:'×', mixedInput:true, natFirst:nf };
+}
+
+/** 진분수 × 진분수 (L33 과정 · L34 4지선다) — 절반쯤은 곱한 뒤 약분이 필요하게 */
+function genFracMulFrac() {
+  for (let t = 0; t < 300; t++) {
+    const b = randInt(2, 9), d = randInt(2, 9);
+    const A = F(coprimeNumer(b), b), B = F(coprimeNumer(d), d);
+    const raw = mulRaw(A, B);
+    const needReduce = gcd(raw.n, raw.d) > 1;
+    if (Math.random() < 0.5 && !needReduce) continue;
+    return { op:'frac-mul-frac', A, B, sign:'×' };
+  }
+  return { op:'frac-mul-frac', A:F(2, 3), B:F(3, 4), sign:'×' };
+}
+
+/** 대분수 × 대분수 (L35 과정 · L36 4지선다)
+ *  수가 너무 커지지 않게 정수 부분 1~3 · 분모 2~6, 약분 전 분자 200 이하. 답이 정수면 다시 */
+function genMixedMulMixed() {
+  for (let t = 0; t < 300; t++) {
+    const b = randInt(2, 6), d = randInt(2, 6);
+    const A = fromMixed(randInt(1, 3), coprimeNumer(b), b);
+    const B = fromMixed(randInt(1, 2), coprimeNumer(d), d);
+    const raw = mulRaw(A, B);
+    if (raw.n > 200 || isWhole(raw)) continue;
+    return { op:'mixed-mul-mixed', A, B, sign:'×', mixedInput:true };
+  }
+  return { op:'mixed-mul-mixed', A:fromMixed(1, 1, 2), B:fromMixed(2, 1, 3), sign:'×', mixedInput:true };
 }
 
 /** 과정 문제의 정답 */
@@ -346,7 +377,7 @@ function fracAnswer(p) {
     case 'same-add': case 'diff-add1': case 'mixed-add': return add(p.A, p.B);
     case 'same-sub': case 'diff-sub':  case 'mixed-sub': return sub(p.A, p.B);
     case 'frac-mul-nat': case 'mixed-mul-nat-split': case 'mixed-mul-nat-improper':
-    case 'mixed-mul-nat': return mul(p.A, p.B);
+    case 'mixed-mul-nat': case 'frac-mul-frac': case 'mixed-mul-mixed': return mul(p.A, p.B);
     default: return F(0, 1);
   }
 }
@@ -451,7 +482,12 @@ function nearChoices(ans, pool, count) {
   return chosen.map(f => mixC(f, false));
 }
 
-/** 진분수 × 자연수 (L24) */
+/** 분수 × 자연수 문제 표기 — natFirst 이면 자연수 × 분수 */
+const mulNatQ = (fracPart, k, natFirst) => natFirst
+  ? `<span class="qc-num">${k}</span><span class="q-op">×</span>${fracPart}`
+  : `${fracPart}<span class="q-op">×</span><span class="qc-num">${k}</span>`;
+
+/** 진분수 × 자연수 (L24 · L29) */
 function fracMulNatQuestion(p) {
   const ans = fracAnswer(p);                          // 기약 (진분수 또는 가분수)
   const raw = F(p.A.n * p.k, p.A.d), k = p.k;
@@ -463,6 +499,7 @@ function fracMulNatQuestion(p) {
     m.w >= 2 ? fromMixed(m.w - 1, m.n, m.d) : null,
     F(p.A.n + k, p.A.d),                                            // 자연수를 분자에 더함
     F(p.A.n * k, p.A.d + k),                                        // 분모에도 더해 버림
+    F(p.A.n, p.A.d * k),                                            // 자연수를 분모에 곱해 버림
     m.w >= 1 ? fromMixed(m.w, 1, m.d + 1) : F(1, ans.d + 1),        // 분모 하나 큰 이웃값
     m.w >= 1 ? fromMixed(m.w, m.d, m.d + 1) : F(ans.d, ans.d + 1)
   ];
@@ -473,13 +510,13 @@ function fracMulNatQuestion(p) {
   // 형태 오답은 3개 중 최대 1개만 (나머지는 값이 가까운 보기)
   const cands = (form.length && Math.random() < 0.5) ? [pick(form)].concat(near) : near.concat(form);
   return {
-    display: eqQ(`${fracHTML(p.A)}<span class="q-op">×</span><span class="qc-num">${k}</span>`),
+    display: eqQ(mulNatQ(fracHTML(p.A), k, p.natFirst)),
     choices: finalize(mixC(ans, true), cands,
       () => { const f = F(coprimeNumer(ans.d + 1) + (m.w || 0) * (ans.d + 1), ans.d + 1); return eqValue(f, ans) ? null : mixC(f, false); })
   };
 }
 
-/** 대분수 × 자연수 (L27) */
+/** 대분수 × 자연수 (L27 · L32) */
 function mixedMulNatQuestion(p) {
   const ans = fracAnswer(p);                          // 기약 가분수
   const raw = mulRaw(p.A, p.B);                       // 약분 전 (가분수 분자 × 자연수)
@@ -497,8 +534,58 @@ function mixedMulNatQuestion(p) {
   if (!eqExact(raw, ans)) form.push(fracC(raw, false, NEAR_MIXED));
   const cands = Math.random() < 0.5 ? [pick(form)].concat(near) : near.concat(form);
   return {
-    display: eqQ(`${mixedHTML(p.A)}<span class="q-op">×</span><span class="qc-num">${k}</span>`),
+    display: eqQ(mulNatQ(mixedHTML(p.A), k, p.natFirst)),
     choices: finalize(mixC(ans, true), cands,
+      () => { const f = fromMixed(m.w, coprimeNumer(m.d + 1), m.d + 1); return eqValue(f, ans) ? null : mixC(f, false); })
+  };
+}
+
+/** 진분수 × 진분수 (L34) — 답은 늘 1보다 작은 기약분수
+ *  오답: 약분 안 한 답 · 분자·분모를 더해 버림 · 분모는 그대로 둠 · 엇갈려 곱함 · 분자/분모 ±1 */
+function fracMulFracQuestion(p) {
+  const { A, B } = p;
+  const ans = fracAnswer(p);
+  const raw = mulRaw(A, B);
+  const form = !eqExact(raw, ans) ? [fracC(raw, false, NEAR_REDUCE)] : [];
+  const wrong = [
+    F(A.n + B.n, A.d + B.d),                 // 분자끼리·분모끼리 더함
+    F(A.n * B.n, A.d),                       // 분모는 그대로 둠 (앞 분수 분모)
+    F(A.n * B.n, B.d),                       // 〃 (뒤 분수 분모)
+    F(A.n * B.d, A.d * B.n),                 // 엇갈려 곱함 (나눗셈과 헷갈림)
+    F(ans.n + 1, ans.d), F(ans.n - 1, ans.d), F(ans.n, ans.d + 1), F(ans.n, ans.d - 1)
+  ].filter(f => f.n >= 1 && f.d >= 2 && f.n < f.d)
+   .map(reduce)
+   .filter(f => !eqValue(f, ans));
+  const cands = form.concat(shuffle(wrong).map(f => fracC(f, false)));
+  return {
+    display: eqQ(`${fracHTML(A)}<span class="q-op">×</span>${fracHTML(B)}`),
+    choices: finalize(fracC(ans, true), cands,
+      () => { const dd = ans.d + randInt(1, 6); const f = F(coprimeNumer(dd), dd); return eqValue(f, ans) ? null : fracC(f, false); })
+  };
+}
+
+/** 대분수 × 대분수 (L36)
+ *  가장 흔한 실수 '자연수끼리, 분수끼리 따로 곱하기'를 늘 보기로 넣고, 나머지는 값이 가까운 보기 */
+function mixedMulMixedQuestion(p) {
+  const ans = fracAnswer(p);                          // 기약 가분수
+  const raw = mulRaw(p.A, p.B);
+  const m = toMixed(ans), a = toMixed(p.A), b = toMixed(p.B);
+  const cands = [];
+  const split = add(F(a.w * b.w, 1), F(a.n * b.n, a.d * b.d));     // 자연수끼리 · 분수끼리 곱함
+  if (!eqValue(split, ans) && !isWhole(split)) cands.push(mixC(split, false));
+  const pool = [
+    fromMixed(m.w, m.n + 1, m.d), fromMixed(m.w, m.n - 1, m.d),     // 분자 ±1
+    fromMixed(m.w + 1, m.n, m.d), m.w > 1 ? fromMixed(m.w - 1, m.n, m.d) : null,   // 정수부 ±1
+    fromMixed(m.w, m.n, m.d + 1), m.d > 2 && m.n < m.d - 1 ? fromMixed(m.w, m.n, m.d - 1) : null,  // 분모 ±1
+    add(F(a.w * b.w, 1), F(a.n * b.n + 1, a.d * b.d))               // 따로 곱한 값의 이웃
+  ];
+  const near = nearChoices(ans, pool, 2);
+  const form = [fracC(ans, false, NEAR_MIXED)];
+  if (!eqExact(raw, ans)) form.push(fracC(raw, false, NEAR_MIXED));
+  const rest = Math.random() < 0.5 ? [pick(form)].concat(near) : near.concat(form);
+  return {
+    display: eqQ(`${mixedHTML(p.A)}<span class="q-op">×</span>${mixedHTML(p.B)}`),
+    choices: finalize(mixC(ans, true), cands.concat(rest),
       () => { const f = fromMixed(m.w, coprimeNumer(m.d + 1), m.d + 1); return eqValue(f, ans) ? null : mixC(f, false); })
   };
 }
@@ -616,7 +703,11 @@ const CHOICE_GENS = {
   'dec-add-mix': () => decQuestion(true,  true),
   'dec-sub-mix': () => decQuestion(false, true),
   'frac-mul-nat':  () => fracMulNatQuestion(genFracMulNat()),
-  'mixed-mul-nat': () => mixedMulNatQuestion(genMixedMulNat('mixed-mul-nat'))
+  'mixed-mul-nat': () => mixedMulNatQuestion(genMixedMulNat('mixed-mul-nat')),
+  'nat-mul-frac':  () => fracMulNatQuestion(genFracMulNat(true)),
+  'nat-mul-mixed': () => mixedMulNatQuestion(genMixedMulNat('mixed-mul-nat', true)),
+  'frac-mul-frac': () => fracMulFracQuestion(genFracMulFrac()),
+  'mixed-mul-mixed': () => mixedMulMixedQuestion(genMixedMulMixed())
 };
 
 function generateChoiceSet(level, count) {
@@ -638,6 +729,11 @@ function generateStepProblem(level) {
     case 'frac-mul-nat':           return genFracMulNat();
     case 'mixed-mul-nat-split':    return genMixedMulNat('mixed-mul-nat-split');
     case 'mixed-mul-nat-improper': return genMixedMulNat('mixed-mul-nat-improper');
+    case 'nat-mul-frac':           return genFracMulNat(true);
+    case 'nat-mul-mixed-split':    return genMixedMulNat('mixed-mul-nat-split', true);
+    case 'nat-mul-mixed-improper': return genMixedMulNat('mixed-mul-nat-improper', true);
+    case 'frac-mul-frac':          return genFracMulFrac();
+    case 'mixed-mul-mixed':        return genMixedMulMixed();
     default:          return genDiffSub();
   }
 }

@@ -130,6 +130,7 @@ function origHTML() {
   }
   if (p.op === 'common-steps') return `${fracHTML(p.A)}<span class="pair-sep">${josa(p.A.n, '과', '와')}</span>${fracHTML(p.B)}`;
   const show = p.mixedInput ? mixedHTML : fracHTML;
+  if (p.natFirst) return `${show(p.B)}<span class="q-op">${p.sign}</span>${show(p.A)}`;   // 자연수 × 분수
   return `${show(p.A)}<span class="q-op">${p.sign}</span>${show(p.B)}`;
 }
 
@@ -198,7 +199,7 @@ function buildSteps() {
 
   const isMixedLevel = !!p.mixedInput;
   const isDiv  = false;                      // 나눗셈 과정 레벨은 현재 커리큘럼에 없음
-  const isMul  = false;
+  const isMul  = p.op === 'frac-mul-frac' || p.op === 'mixed-mul-mixed';   // 분수 × 분수 (L33 · L35)
   const isAdd  = /-add/.test(p.op) || /^same-add/.test(p.op);
 
   rows = ['orig'];
@@ -257,14 +258,17 @@ function buildSteps() {
   prob.answer = red;
 }
 
-/* ═══ 분수 × 자연수 (L23 · L25 · L26) ═══
+/* ═══ 분수 × 자연수 (L23 · L25 · L26) · 자연수 × 분수 (L28 · L30 · L31) ═══
  *   frac-mul-nat            진분수 × 자연수 — 분자 × 자연수 → 약분 → 대분수
  *   mixed-mul-nat-split     대분수 × 자연수 ① — 자연수 부분·분수 부분을 따로 곱해서 더하기
  *   mixed-mul-nat-improper  대분수 × 자연수 ② — 가분수로 고쳐서 분자 × 자연수
+ * p.natFirst 이면 자연수가 앞에 오는 문제(3 × 2/5)로, 같은 단계를 '자연수 × …' 순서로 보여 준다.
  */
 function buildMulNatSteps(p) {
-  const k = p.k;
-  const times = html => `${html}<span class="q-op">×</span><span class="fr-int">${k}</span>`;
+  const k = p.k, nf = !!p.natFirst;
+  const kInt = `<span class="fr-int">${k}</span>`;
+  const times = html => nf ? `${kInt}<span class="q-op">×</span>${html}` : `${html}<span class="q-op">×</span>${kInt}`;
+  const mulQ = a => nf ? `<b>${k} × ${a}</b>` : `<b>${a} × ${k}</b>`;
   const plus  = (a, b) => `<span class="fr-int">${a}</span><span class="q-op">+</span>${b}`;
 
   if (p.op === 'mixed-mul-nat-split') {
@@ -275,12 +279,15 @@ function buildMulNatSteps(p) {
     rows = ['orig', 'split', 'calc', 'reduce'];
     if (isImproper(raw)) rows.push('part');
     rows.push('answer');
-    steps.push(stepAuto('따로 곱하기', `자연수 부분 <b>${w}</b>${josa(w, '과', '와')} 분수 부분 ${fracHTML(part)}${fracJosa(part, '을', '를')} 따로 ${k}${josa(k, '과', '와')} 곱해요`,
+    const splitMsg = nf
+      ? `<b>${k}</b>에 자연수 부분 <b>${w}</b>${josa(w, '과', '와')} 분수 부분 ${fracHTML(part)}${fracJosa(part, '을', '를')} 따로 곱해요`
+      : `자연수 부분 <b>${w}</b>${josa(w, '과', '와')} 분수 부분 ${fracHTML(part)}${fracJosa(part, '을', '를')} 따로 ${k}${josa(k, '과', '와')} 곱해요`;
+    steps.push(stepAuto('따로 곱하기', splitMsg,
       () => { fill('split', `${grp(times(`<span class="fr-int">${w}</span>`))}<span class="q-op">+</span>${grp(times(fracHTML(part)))}`);
               fill('calc', plus('?', slot('?', m.d))); }));
-    steps.push(stepNum('자연수 부분 곱하기', `먼저 자연수 부분 <b>${w} × ${k}</b> = ?`, wk,
+    steps.push(stepNum('자연수 부분 곱하기', `먼저 자연수 부분 ${mulQ(w)} = ?`, wk,
       () => fill('calc', plus(wk, slot('?', m.d)))));
-    steps.push(stepNum('분수 부분 곱하기', `분수 부분은 분모를 그대로 두고 <b>${m.n} × ${k}</b> = ?`, m.n * k,
+    steps.push(stepNum('분수 부분 곱하기', `분수 부분은 분모를 그대로 두고 ${mulQ(m.n)} = ?`, m.n * k,
       () => fill('calc', plus(wk, fracHTML(raw)))));
     const red = pushReduce(raw, r => plus(wk, fracHTML(r)));
     if (isImproper(red)) {
@@ -303,7 +310,7 @@ function buildMulNatSteps(p) {
   }
   rows.push('calc', 'reduce');
   const raw = F(A.n * k, A.d);
-  steps.push(stepNum('분자 × 자연수', `분모는 그대로 두고 <b>${A.n} × ${k}</b> = ?`, raw.n,
+  steps.push(stepNum(nf ? '자연수 × 분자' : '분자 × 자연수', `분모는 그대로 두고 ${mulQ(A.n)} = ?`, raw.n,
     () => fill('calc', fracHTML(raw))));
   const red = pushReduce(raw);
   if (p.mixedInput || isImproper(red)) {

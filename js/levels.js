@@ -1,10 +1,11 @@
-/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (28레벨: 분수·소수·분수의 곱셈) */
+/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (37레벨: 분수·소수·분수의 곱셈) */
 
 const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L9-2','L10','L11',
                      'L12','L13','L14','L15','L16','L17','L18','L19','L20','L21','L22',
-                     'L23','L24','L25','L26','L27'];
+                     'L23','L24','L25','L26','L27',
+                     'L28','L29','L30','L31','L32','L33','L34','L35','L36'];
 
-/** 레벨별 만점 — L1 90점부터 레벨당 +5 (L27 = 220)
+/** 레벨별 만점 — L1 90점부터 레벨당 +5 (L27 = 220 · L36 = 265)
  *  L9-2 는 나중에 끼워 넣은 레벨이라 기존 기록(레벨 번호·만점)을 건드리지 않도록 L9 와 L10 사이 값(133)으로 고정 */
 const LEVEL_MAX = {};
 LEVEL_ORDER.filter(lv => lv !== 'L9-2').forEach((lv, i) => { LEVEL_MAX[lv] = 90 + i * 5; });
@@ -21,13 +22,15 @@ const GROUP_LABELS = {
   diff:    '➕➖ 분모가 다른 분수',
   mixed:   '🎯 대분수',
   dec:     '🔢 소수 계산',
-  mul:     '✖️ 분수의 곱셈'
+  mul:     '✖️ 분수의 곱셈 ① — 분수 × 자연수',
+  mul2:    '✖️ 분수의 곱셈 ② — 자연수 × 분수 · 분수 × 분수'
 };
 
 /* 제한시간 = 문제 수 × 유형별 단가(초)
  *   개념 그림 12초 · 변환 15초 · 동분모 13초 · 통분 18초 · 소수 13~14초
  *   과정형 65~104초 (단계 수가 많아 4지선다보다 넉넉하게)
  *   분수의 곱셈 과정형 45~65초 (통분이 없어 단계가 적음) · 4지선다 16~24초
+ *   대분수 × 대분수 과정형은 가분수 2번 + 큰 수 곱셈이라 90초 · 4지선다 30초
  */
 const T = (q, per) => q * per;
 
@@ -122,7 +125,35 @@ const LEVEL_CONFIGS = {
          theme:{bg:'bg-emerald-50',border:'border-emerald-300',hbg:'hover:bg-emerald-100',lbl:'text-emerald-900',descCls:'text-emerald-700'} },
   L27: { group:'mul',     engine:'choice', type:'mixed-mul-nat',     chalQ:15, chalTime:T(15,24),
          label:'대분수 × 자연수 계산하기', desc:'4지선다로 빠르게 풀기 — 보기가 서로 비슷하니 꼼꼼히',
-         theme:{bg:'bg-green-50',  border:'border-green-300',  hbg:'hover:bg-green-100',  lbl:'text-green-900',  descCls:'text-green-700'} }
+         theme:{bg:'bg-green-50',  border:'border-green-300',  hbg:'hover:bg-green-100',  lbl:'text-green-900',  descCls:'text-green-700'} },
+
+  L28: { group:'mul2',    engine:'frac',   op:'nat-mul-frac',           chalQ:10, chalTime:T(10,45),
+         label:'자연수 × 진분수 (과정)', desc:'분모는 그대로, 자연수 × 분자 → 약분 → 대분수',
+         theme:{bg:'bg-yellow-50', border:'border-yellow-200', hbg:'hover:bg-yellow-100', lbl:'text-yellow-800', descCls:'text-yellow-700'} },
+  L29: { group:'mul2',    engine:'choice', type:'nat-mul-frac',         chalQ:20, chalTime:T(20,16),
+         label:'자연수 × 진분수 계산하기', desc:'4지선다로 빠르게 풀기 — 보기가 서로 비슷하니 꼼꼼히',
+         theme:{bg:'bg-yellow-50', border:'border-yellow-300', hbg:'hover:bg-yellow-100', lbl:'text-yellow-900', descCls:'text-yellow-800'} },
+  L30: { group:'mul2',    engine:'frac',   op:'nat-mul-mixed-split',    chalQ:8,  chalTime:T(8,65),
+         label:'자연수 × 대분수 (과정 ①)', desc:'자연수 부분과 분수 부분에 따로 곱해서 더하기',
+         theme:{bg:'bg-orange-50', border:'border-orange-200', hbg:'hover:bg-orange-100', lbl:'text-orange-800', descCls:'text-orange-600'} },
+  L31: { group:'mul2',    engine:'frac',   op:'nat-mul-mixed-improper', chalQ:8,  chalTime:T(8,55),
+         label:'자연수 × 대분수 (과정 ②)', desc:'대분수를 가분수로 바꿔서 곱하기',
+         theme:{bg:'bg-orange-50', border:'border-orange-300', hbg:'hover:bg-orange-100', lbl:'text-orange-900', descCls:'text-orange-700'} },
+  L32: { group:'mul2',    engine:'choice', type:'nat-mul-mixed',        chalQ:15, chalTime:T(15,24),
+         label:'자연수 × 대분수 계산하기', desc:'4지선다로 빠르게 풀기 — 보기가 서로 비슷하니 꼼꼼히',
+         theme:{bg:'bg-orange-50', border:'border-orange-300', hbg:'hover:bg-orange-100', lbl:'text-orange-900', descCls:'text-orange-700'} },
+  L33: { group:'mul2',    engine:'frac',   op:'frac-mul-frac',          chalQ:10, chalTime:T(10,50),
+         label:'진분수 × 진분수 (과정)', desc:'분자끼리 · 분모끼리 곱하기 → 약분',
+         theme:{bg:'bg-red-50',    border:'border-red-200',    hbg:'hover:bg-red-100',    lbl:'text-red-800',    descCls:'text-red-600'} },
+  L34: { group:'mul2',    engine:'choice', type:'frac-mul-frac',        chalQ:20, chalTime:T(20,20),
+         label:'진분수 × 진분수 계산하기', desc:'4지선다로 빠르게 풀기',
+         theme:{bg:'bg-red-50',    border:'border-red-300',    hbg:'hover:bg-red-100',    lbl:'text-red-900',    descCls:'text-red-700'} },
+  L35: { group:'mul2',    engine:'frac',   op:'mixed-mul-mixed',        chalQ:8,  chalTime:T(8,90),
+         label:'대분수 × 대분수 (과정)', desc:'두 대분수를 가분수로 → 분자끼리 · 분모끼리 곱하기 → 약분 → 대분수',
+         theme:{bg:'bg-purple-50', border:'border-purple-200', hbg:'hover:bg-purple-100', lbl:'text-purple-800', descCls:'text-purple-600'} },
+  L36: { group:'mul2',    engine:'choice', type:'mixed-mul-mixed',      chalQ:15, chalTime:T(15,30),
+         label:'대분수 × 대분수 계산하기', desc:'4지선다로 빠르게 풀기 — 자연수끼리 · 분수끼리 곱하면 안 돼요',
+         theme:{bg:'bg-purple-50', border:'border-purple-300', hbg:'hover:bg-purple-100', lbl:'text-purple-900', descCls:'text-purple-700'} }
 };
 
 /* ═══ 잠금 ═══
