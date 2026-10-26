@@ -5,7 +5,8 @@ const L = window.Levels;
 const state = {
   classCode: null, className: '',
   studentNo: null, studentName: '',
-  level: null, bestScores: {}, chart: null
+  level: null, bestScores: {}, chart: null,
+  loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
 };
 
 const $ = id => document.getElementById(id);
@@ -20,6 +21,13 @@ const remember = {
   get() { try { return localStorage.getItem('mp.lastClass') || ''; } catch (e) { return ''; } },
   set(v) { try { localStorage.setItem('mp.lastClass', v); } catch (e) {} },
   clear() { try { localStorage.removeItem('mp.lastClass'); } catch (e) {} }
+};
+
+/** 마지막으로 서버에서 확인한 레벨 최고점 — 기록 읽기가 실패했을 때만 꺼내 쓴다 */
+const bestBackup = {
+  key() { return `mp.best.${state.classCode}.${state.studentNo}`; },
+  get() { try { return JSON.parse(localStorage.getItem(bestBackup.key())) || null; } catch (e) { return null; } },
+  set(v) { try { localStorage.setItem(bestBackup.key(), JSON.stringify(v)); } catch (e) {} }
 };
 
 /* ═══ 부팅 ═══ */
@@ -155,16 +163,40 @@ function backToStudents() {
 
 /* ═══ 레벨 ═══ */
 function loadLevels() {
-  DB.getBestScores(state.classCode, state.studentNo)
-    .then(s => { state.bestScores = s || {}; })
-    .catch(() => { state.bestScores = {}; })
-    .then(() => { renderLevelButtons(); only('levelSelection'); });
+  fetchBestScores().then(() => { renderLevelButtons(); only('levelSelection'); });
+}
+
+/** 최고점 읽기. 실패하면 빈 기록으로 덮지 않는다 — 화면에 있던 점수나 기기 백업을 그대로 쓴다.
+ *  (예전에는 실패 = 빈 기록이라, Firestore 읽기 한도가 바닥나면 다 푼 학생도 '초기화'된 것처럼 보였다) */
+function fetchBestScores() {
+  return DB.getBestScores(state.classCode, state.studentNo)
+    .then(s => { state.bestScores = s || {}; state.loadFailed = false; bestBackup.set(state.bestScores); })
+    .catch(err => {
+      console.warn('기록 읽기 실패', err);
+      state.loadFailed = true;
+      if (!Object.keys(state.bestScores).length) state.bestScores = bestBackup.get() || {};
+    });
+}
+
+function retryLoadLevels() {
+  $('levelList').innerHTML = '<div class="text-center text-sm text-gray-500 py-4">다시 불러오는 중...</div>';
+  DB.invalidate();
+  loadLevels();
 }
 
 function renderLevelButtons() {
   const container = $('levelList');
   container.innerHTML = '';
   let group = '', groupDiv = null;
+
+  if (state.loadFailed) {
+    const hasAny = Object.keys(state.bestScores).length > 0;
+    const warn = document.createElement('div');
+    warn.className = 'bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-sm text-amber-800 font-bold';
+    warn.innerHTML = `⚠️ 기록을 불러오지 못했어요. ${hasAny ? '이 기기에 남아 있던 마지막 기록을 보여 주고 있어요.' : '잠겨 보여도 기록은 지워지지 않았어요.'}
+      <button class="mt-2 w-full py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition" onclick="App.retryLoadLevels()">🔄 다시 불러오기</button>`;
+    container.appendChild(warn);
+  }
 
   L.LEVEL_ORDER.forEach(lv => {
     const cfg = L.LEVEL_CONFIGS[lv], t = cfg.theme;
@@ -237,11 +269,8 @@ function startPractice(mode) {
 }
 
 function backToLevels() {
-  DB.invalidate();
-  DB.getBestScores(state.classCode, state.studentNo)
-    .then(s => { state.bestScores = s || {}; })
-    .catch(() => {})
-    .then(() => { renderLevelButtons(); only('levelSelection'); });
+  // 방금 저장한 기록은 db.js 가 캐시에 덧붙여 두므로 캐시를 비우지 않는다 (비우면 기록을 전부 다시 읽음)
+  loadLevels();
 }
 
 /* ═══ 성장 그래프 · 랭킹 ═══ */
@@ -308,7 +337,7 @@ return {
   get studentName() { return state.studentName; },
   only, showClassEntry, submitClassCode, leaveClass,
   goToPin, submitStudentPin, backToStudents,
-  selectLevel, startPractice, backToLevels,
+  selectLevel, startPractice, backToLevels, retryLoadLevels,
   renderRankingTable
 };
 })();

@@ -37,6 +37,17 @@ service cloud.firestore {
         && d.ts is number;
     }
 
+    // 랭킹용 최고점 요약 — 문서 ID = 학번. 이미 있는 레벨을 빼고 덮어쓸 수는 없다.
+    function validBest(id) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['studentNo', 'best'])
+        && d.keys().size() <= 4
+        && d.studentNo is string && d.studentNo == id
+        && d.best is map && d.best.size() <= 80
+        && (!d.keys().hasAny(['lastTs']) || d.lastTs is number)
+        && (resource == null || d.best.keys().hasAll(resource.data.best.keys()));
+    }
+
     function validStudent() {
       let d = request.resource.data;
       return d.keys().hasAll(['number', 'name'])
@@ -80,6 +91,13 @@ service cloud.firestore {
         allow read: if true;
         allow create: if validResult();
         allow update: if false;
+        allow delete: if isOwner(code);
+      }
+
+      // 랭킹용 최고점 요약 — 학생 기기가 자기 기록으로 계산해 갱신, 지우는 것은 담당 교사만
+      match /best/{id} {
+        allow read: if true;
+        allow create, update: if validBest(id);
         allow delete: if isOwner(code);
       }
 

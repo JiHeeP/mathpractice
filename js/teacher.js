@@ -212,7 +212,7 @@ function clearRecords() {
 
 /* ═══ 대시보드 ═══ */
 function loadRanking() {
-  DB.getRanking(currentClass.code)
+  DB.getRanking(currentClass.code, 0, { full: true })   // 반 전체 기록으로 계산하고 학생 랭킹 요약도 채운다
     .then(list => App.renderRankingTable('tRankingBody', list, '아직 기록이 없습니다.'))
     .catch(() => App.renderRankingTable('tRankingBody', [], '불러오기 실패'));
 }
