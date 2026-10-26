@@ -30,6 +30,12 @@ const bestBackup = {
   set(v) { try { localStorage.setItem(bestBackup.key(), JSON.stringify(v)); } catch (e) {} }
 };
 
+/** 학생이 바뀌면 앞 학생의 점수를 지운다 — 같은 기기에서 읽기에 실패했을 때 앞 학생 점수가 보이지 않도록 */
+function resetStudent() {
+  state.studentNo = null; state.studentName = '';
+  state.bestScores = {}; state.loadFailed = false;
+}
+
 /* ═══ 부팅 ═══ */
 function boot() {
   DB.init();
@@ -79,7 +85,8 @@ function enterClass(code, studentParam, silentFail) {
 
 function leaveClass() {
   remember.clear();
-  state.classCode = null; state.studentNo = null;
+  state.classCode = null;
+  resetStudent();
   history.replaceState(null, '', location.pathname);
   showClassEntry();
 }
@@ -92,6 +99,7 @@ function loadStudents(studentParam) {
     if (studentParam) {
       const found = list.find(s => String(s.number) === String(studentParam));
       if (found) {
+        resetStudent();
         state.studentNo = found.number; state.studentName = found.name;
         $('gameTitle').textContent = `${found.name} 학생의 연산 마스터`;
         DB.verifyStudentPin(state.classCode, found.number, '').then(r => {
@@ -119,6 +127,7 @@ function renderStudentButtons(list) {
 }
 
 function selectStudent(no, name, btn) {
+  resetStudent();
   state.studentNo = no; state.studentName = name;
   document.querySelectorAll('#studentButtons button').forEach(b => b.classList.remove('ring-2','ring-orange-400','bg-orange-50'));
   btn.classList.add('ring-2','ring-orange-400','bg-orange-50');
@@ -154,7 +163,7 @@ function submitStudentPin() {
 }
 
 function backToStudents() {
-  state.studentNo = null; state.studentName = '';
+  resetStudent();
   $('gameTitle').textContent = '분수 연산 마스터';
   const go = $('goToPinBtn');
   go.disabled = true; go.classList.replace('bg-orange-500','bg-gray-300');

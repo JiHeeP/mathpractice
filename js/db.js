@@ -418,7 +418,8 @@ function summariesFromRows(rows) {
 async function loadBestSummaries(code) {
   return cached('rankbest:' + code, async () => {
     const snap = await bestCol(code).get();
-    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), best: d.data().best || {}, lastTs: d.data().lastTs || 0 }));
+    // 예전에 저장된 요약에도 L9-2 통과 인정을 똑같이 적용한다
+    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), best: Levels.applyBackfillPass(Object.assign({}, d.data().best || {})), lastTs: d.data().lastTs || 0 }));
   }, RANK_CACHE_MS);
 }
 
@@ -554,7 +555,7 @@ async function clearRecords(code, onProgress) {
     } catch (e) {
       // 접속 로그 삭제를 막아 둔 예전 보안 규칙에서는 여기로 온다.
       // 점수와 무관하고 24시간 뒤 감시 대상에서 빠지므로 나머지는 계속 진행한다.
-      // best(랭킹 요약)도 규칙 배포 전이면 막히는데, 학생이 다시 접속하면 새 기록으로 덮어쓴다.
+      // best(랭킹 요약) 삭제가 막혀도, 학생이 다시 접속하거나 교사 랭킹 탭을 열면 바른 값으로 덮어쓴다.
       if (col === 'logs') removed.logsBlocked = true;
       else if (col === 'best') { /* 무시 */ }
       else throw e;
