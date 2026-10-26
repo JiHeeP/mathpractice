@@ -6,13 +6,22 @@
  *                                         offDays = 반이 정한 '등교 안 하는 날' (YYYY-MM-DD 배열)
  *   classes/{code}/students/{번호}     : { number, name, pinHash }
  *   classes/{code}/results/{auto}      : 연습·도전 기록
+ *   classes/{code}/best/{번호}         : 학생별 레벨 최고점 요약 { studentNo, best:{레벨:점수}, lastTs } — 랭킹용
  *   classes/{code}/logs/{auto}         : 접속 로그
+ *
+ * ⚠️ Firestore 무료 요금제는 하루 읽기 5만 건까지다. 반 전체 기록을 자주 읽으면 금방 바닥나고,
+ *    그러면 모든 읽기가 실패해 학생 기록이 '초기화'된 것처럼 보인다.
+ *    그래서 학생 화면은 자기 기록만, 랭킹은 best 요약(학생 수만큼)만 읽는다.
+ *    반 전체 기록은 교사 화면에서만 읽는다.
  *
  * Firebase 설정이 없으면 localStorage 로컬 모드로 동작한다.
  * 로컬 모드에서는 로그인도 흉내만 내므로(uid 'local') 배포 전 개발·테스트 전용이다.
  */
 const DB = (() => {
 const CACHE_MS = 60 * 1000;
+const MINE_CACHE_MS = 30 * 60 * 1000;   // 내 기록 — 저장할 때 캐시에 직접 덧붙이므로 길게
+const RANK_CACHE_MS = 5 * 60 * 1000;    // 랭킹 — 친구 점수는 몇 분 늦게 보여도 된다
+const ALL_CACHE_MS = 10 * 60 * 1000;    // 반 전체 기록 (교사 화면 · 랭킹 대체 경로)
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 헷갈리는 O/I/L/0/1 제외
 
 let db = null, fbAuth = null, mode = 'local';
@@ -36,9 +45,9 @@ function init() {
 }
 const isLocal = () => mode === 'local';
 const invalidate = () => { cache = {}; };
-function cached(key, loader) {
+function cached(key, loader, ms = CACHE_MS) {
   const hit = cache[key];
-  if (hit && Date.now() - hit.at < CACHE_MS) return Promise.resolve(hit.data);
+  if (hit && Date.now() - hit.at < ms) return Promise.resolve(hit.data);
   return Promise.resolve(loader()).then(data => { cache[key] = { at: Date.now(), data }; return data; });
 }
 
@@ -276,12 +285,35 @@ function logAccess(code, studentNo) {
 }
 
 /* ═══ 기록 ═══ */
-async function loadResults(code) {
+const resultsCol = code => db.collection('classes').doc(code).collection('results');
+const bestCol = code => db.collection('classes').doc(code).collection('best');
+
+/** 한 학생의 기록만 읽는다 (studentNo 단일 필드 조건이라 색인을 따로 만들 필요 없음) */
+async function loadMyResults(code, studentNo) {
+  const no = String(studentNo);
+  return cached(`mine:${code}:${no}`, async () => {
+    if (isLocal()) return LS.get(`cls.${code}.results`, []).filter(r => String(r.studentNo) === no);
+    const snap = await resultsCol(code).where('studentNo', '==', no).get();
+    return snap.docs.map(d => d.data());
+  }, MINE_CACHE_MS);
+}
+
+/** 반 전체 기록 — 1000건씩 끝까지 나눠 읽는다 (예전의 3000건 상한 없음). 교사 화면 전용 */
+async function loadAllResults(code) {
   return cached('results:' + code, async () => {
     if (isLocal()) return LS.get(`cls.${code}.results`, []);
-    const snap = await db.collection('classes').doc(code).collection('results').orderBy('ts', 'desc').limit(3000).get();
-    return snap.docs.map(d => d.data());
-  });
+    const all = [];
+    let last = null;
+    for (;;) {
+      let q = resultsCol(code).orderBy('ts', 'desc').limit(1000);
+      if (last) q = q.startAfter(last);
+      const snap = await q.get();
+      snap.docs.forEach(d => all.push(d.data()));
+      if (snap.docs.length < 1000) break;
+      last = snap.docs[snap.docs.length - 1];
+    }
+    return all;
+  }, ALL_CACHE_MS);
 }
 
 async function saveResult(code, payload) {
@@ -289,12 +321,17 @@ async function saveResult(code, payload) {
   const row = Object.assign({}, payload, { score: outcome.recordedScore, ts: Date.now(), dateKey: dateKey(new Date()) });
   try {
     if (isLocal()) { const r = LS.get(`cls.${code}.results`, []); r.push(row); LS.set(`cls.${code}.results`, r); }
-    else await db.collection('classes').doc(code).collection('results').add(row);
-    invalidate();
+    else await resultsCol(code).add(row);
   } catch (e) {
     console.warn('결과 저장 실패', e);
     return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
+  // 캐시를 통째로 비우면 다음 화면에서 기록을 전부 다시 읽게 되므로, 방금 저장한 한 줄만 덧붙인다.
+  const mine = cache[`mine:${code}:${String(row.studentNo)}`];
+  if (mine) mine.data = mine.data.concat([row]);
+  const all = cache['results:' + code];
+  if (all) all.data = [row].concat(all.data);
+  if (mine) syncBest(code, row.studentNo, bestOf(mine.data), lastTsOf(mine.data));
   return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
 }
 
@@ -311,22 +348,47 @@ function scoreOf(r) {
   return s;
 }
 
-async function getBestScores(code, studentNo) {
-  const rows = await loadResults(code);
+/** 기록 목록 → { 레벨: 최고점 } */
+function bestOf(rows) {
   const best = {};
   rows.forEach(r => {
-    if (String(r.studentNo) !== String(studentNo)) return;
     const s = scoreOf(r);
     if (s === null) return;
     if (!best[r.level] || s > best[r.level]) best[r.level] = s;
   });
+  return Levels.applyBackfillPass(best);
+}
+function lastTsOf(rows) {
+  return rows.reduce((m, r) => (scoreOf(r) !== null && r.ts > m ? r.ts : m), 0);
+}
+
+/* ── 랭킹용 최고점 요약 (classes/{code}/best/{번호}) ──
+ * 학생이 자기 기록을 읽거나 점수를 저장할 때 갱신한다. 내용이 같으면 다시 쓰지 않는다.
+ * 보안 규칙을 아직 배포하지 않아 쓰기가 막혀도 학생 화면에는 영향이 없다(랭킹만 대체 경로로). */
+const syncedBest = {};
+function syncBest(code, studentNo, best, lastTs) {
+  if (isLocal()) return Promise.resolve();
+  if (!Object.keys(best).length) return Promise.resolve();
+  const no = String(studentNo), key = `${code}:${no}`;
+  const sig = JSON.stringify(best);
+  if (syncedBest[key] === sig) return Promise.resolve();
+  syncedBest[key] = sig;
+  return bestCol(code).doc(no).set({ studentNo: no, best, lastTs: lastTs || 0 })
+    .then(() => { delete cache['rankbest:' + code]; })
+    .catch(e => { delete syncedBest[key]; console.warn('최고점 요약 저장 실패', e); });
+}
+
+async function getBestScores(code, studentNo) {
+  const rows = await loadMyResults(code, studentNo);
+  const best = bestOf(rows);
+  syncBest(code, studentNo, best, lastTsOf(rows));
   return best;
 }
 
 async function getHistory(code, studentNo) {
-  const rows = await loadResults(code);
+  const rows = await loadMyResults(code, studentNo);
   return rows
-    .filter(r => String(r.studentNo) === String(studentNo) && scoreOf(r) !== null)
+    .filter(r => scoreOf(r) !== null)
     .map(r => ({ ts:r.ts, label:fmtTime(r.ts), score:scoreOf(r), level:r.level }))
     .sort((a, b) => a.ts - b.ts);
 }
@@ -339,29 +401,56 @@ function compareEntries(a, b) {
   return String(a.studentNo).localeCompare(String(b.studentNo));
 }
 
-/** 랭킹 — 학생마다 레벨별 최고 점수를 모두 더한 '합계 점수' 순.
- *  같은 L22 라도 먼저 푼 순서가 아니라 L1~Ln 최고점 합이 큰 학생이 위로 온다.
- *  합계가 같으면 더 높은 레벨까지 간 학생, 그다음은 마지막 기록이 이른 학생.
- */
-async function getRanking(code, limit) {
-  const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
-  const names = {};
-  students.forEach(s => names[String(s.number)] = s.name);
+/** 반 전체 기록 → 학생별 { studentNo, best, lastTs } */
+function summariesFromRows(rows) {
   const by = {};
   rows.forEach(r => {
     const score = scoreOf(r);
     if (score === null) return;
     const no = String(r.studentNo);
-    const e = by[no] = by[no] || { studentNo:no, name:names[no] || `학생 ${no}`, best:{}, lastTs:0 };
+    const e = by[no] = by[no] || { studentNo:no, best:{}, lastTs:0 };
     if (!e.best[r.level] || score > e.best[r.level]) e.best[r.level] = score;
     if (r.ts > e.lastTs) e.lastTs = r.ts;
   });
-  const entries = Object.values(by).map(e => {
-    const levels = Object.keys(e.best);
-    const total = levels.reduce((sum, lv) => sum + e.best[lv], 0);
+  return Object.values(by).map(e => Object.assign(e, { best: Levels.applyBackfillPass(e.best) }));
+}
+
+async function loadBestSummaries(code) {
+  return cached('rankbest:' + code, async () => {
+    const snap = await bestCol(code).get();
+    // 예전에 저장된 요약에도 L9-2 통과 인정을 똑같이 적용한다
+    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), best: Levels.applyBackfillPass(Object.assign({}, d.data().best || {})), lastTs: d.data().lastTs || 0 }));
+  }, RANK_CACHE_MS);
+}
+
+/** 랭킹 — 학생마다 레벨별 최고 점수를 모두 더한 '합계 점수' 순.
+ *  같은 L22 라도 먼저 푼 순서가 아니라 L1~Ln 최고점 합이 큰 학생이 위로 온다.
+ *  합계가 같으면 더 높은 레벨까지 간 학생, 그다음은 마지막 기록이 이른 학생.
+ *
+ *  학생 화면은 best 요약(학생 수만큼 읽기)으로 만든다.
+ *  교사 화면(opts.full)은 반 전체 기록으로 정확히 계산하고, 그 결과로 모든 학생의 요약을 채워 둔다.
+ */
+async function getRanking(code, limit, opts) {
+  const full = !!(opts && opts.full);
+  let sums;
+  if (isLocal() || full) {
+    sums = summariesFromRows(await loadAllResults(code));
+    if (full) sums.forEach(e => syncBest(code, e.studentNo, e.best, e.lastTs));
+  } else {
+    // 요약을 못 읽어도(보안 규칙 배포 전 등) 반 전체 기록으로 대신하지 않는다 — 그게 읽기 한도를 바닥낸 원인이었다.
+    try { sums = await loadBestSummaries(code); }
+    catch (e) { console.warn('랭킹 요약을 읽지 못했습니다', e); sums = []; }
+  }
+  const students = await getStudents(code);
+  const names = {};
+  students.forEach(s => names[String(s.number)] = s.name);
+  const entries = sums.map(e => {
+    const levels = Object.keys(e.best).filter(lv => levelWeight(lv) > 0);
+    if (!levels.length) return null;
+    const total = levels.reduce((sum, lv) => sum + Number(e.best[lv]), 0);
     const top = levels.reduce((a, b) => (levelWeight(b) > levelWeight(a) ? b : a), levels[0]);
-    return { studentNo:e.studentNo, name:e.name, total:parseFloat(total.toFixed(1)), level:top, levels:levels.length, ts:e.lastTs };
-  });
+    return { studentNo:e.studentNo, name:names[e.studentNo] || `학생 ${e.studentNo}`, total:parseFloat(total.toFixed(1)), level:top, levels:levels.length, ts:e.lastTs };
+  }).filter(Boolean);
   entries.sort((a, b) => {
     let d = b.total - a.total;                         if (d) return d;
     d = levelWeight(b.level) - levelWeight(a.level);   if (d) return d;
@@ -372,8 +461,16 @@ async function getRanking(code, limit) {
   return limit ? ranked.slice(0, limit) : ranked;
 }
 
+/** 두 날짜의 기록만 읽는다 (dateKey 단일 필드 'in' 조건) */
+async function loadResultsOnDates(code, keys) {
+  if (isLocal()) return LS.get(`cls.${code}.results`, []);
+  const snap = await resultsCol(code).where('dateKey', 'in', keys).get();
+  return snap.docs.map(d => d.data());
+}
+
 async function getComparison(code, date1Key, date2Key) {
-  const [rows, students] = await Promise.all([loadResults(code), getStudents(code)]);
+  const keys = date1Key === date2Key ? [date1Key] : [date1Key, date2Key];
+  const [rows, students] = await Promise.all([loadResultsOnDates(code, keys), getStudents(code)]);
   const byStudent = {};
   rows.forEach(r => {
     const sc = scoreOf(r);
@@ -434,6 +531,7 @@ async function getAccessAlerts(code) {
  */
 async function clearRecords(code, onProgress) {
   let removed = { results: 0, logs: 0, logsBlocked: false };
+  Object.keys(syncedBest).forEach(k => { if (k.startsWith(code + ':')) delete syncedBest[k]; });
   if (isLocal()) {
     removed.results = LS.get(`cls.${code}.results`, []).length;
     removed.logs = LS.get(`cls.${code}.logs`, []).length;
@@ -442,14 +540,14 @@ async function clearRecords(code, onProgress) {
     invalidate();
     return removed;
   }
-  for (const col of ['results', 'logs']) {
+  for (const col of ['results', 'best', 'logs']) {
     try {
       for (;;) {
         const snap = await db.collection('classes').doc(code).collection(col).limit(300).get();
         if (!snap.docs.length) break;
         for (const d of snap.docs) {
           await db.collection('classes').doc(code).collection(col).doc(d.id).delete();
-          removed[col]++;
+          if (col !== 'best') removed[col]++;
           if (onProgress) onProgress(removed);
         }
         if (snap.docs.length < 300) break;
@@ -457,7 +555,9 @@ async function clearRecords(code, onProgress) {
     } catch (e) {
       // 접속 로그 삭제를 막아 둔 예전 보안 규칙에서는 여기로 온다.
       // 점수와 무관하고 24시간 뒤 감시 대상에서 빠지므로 나머지는 계속 진행한다.
+      // best(랭킹 요약) 삭제가 막혀도, 학생이 다시 접속하거나 교사 랭킹 탭을 열면 바른 값으로 덮어쓴다.
       if (col === 'logs') removed.logsBlocked = true;
+      else if (col === 'best') { /* 무시 */ }
       else throw e;
     }
   }
