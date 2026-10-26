@@ -179,6 +179,23 @@ function getPrevLevelInfo(level, bestScores) {
   return { level: prev, max: LEVEL_MAX[prev], need: unlockThreshold(prev), best: bestScores[prev] || 0 };
 }
 
+/* ═══ 나중에 끼워 넣은 레벨의 '통과 인정' ═══
+ * L9-2 는 L9 와 L10 사이에 나중에 넣은 레벨이다. 그 전에 이미 L10 이후로 넘어간 학생은
+ * L9-2 를 풀 기회가 없었는데도 L10 도전이 잠겨 버린다.
+ * 그래서 L9-2 를 통과하지 못했더라도 그 뒤 레벨 점수가 하나라도 있으면 L9-2 를 만점으로 인정한다.
+ * (지금은 L9-2 를 통과해야 L10 도전이 열리므로 새로 시작하는 학생에게는 해당되지 않는다)
+ */
+const BACKFILLED_LEVELS = ['L9-2'];
+
+function applyBackfillPass(best) {
+  BACKFILLED_LEVELS.forEach(lv => {
+    if ((best[lv] || 0) >= unlockThreshold(lv)) return;
+    const idx = LEVEL_ORDER.indexOf(lv);
+    if (Object.keys(best).some(l => LEVEL_ORDER.indexOf(l) > idx)) best[lv] = LEVEL_MAX[lv];
+  });
+  return best;
+}
+
 /* ═══ 점수 계산 ═══
  * 만점에서 오답 2점씩 차감. 제한시간의 80%를 넘기면 최대 10점까지 서서히 감점,
  * 제한시간을 초과하면 추가 감점. (4지선다 도전의 오답 +10초 페널티는 duration에 이미 반영됨)
@@ -216,5 +233,6 @@ function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
-  isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel
+  isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
+  applyBackfillPass
 };

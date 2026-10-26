@@ -356,7 +356,7 @@ function bestOf(rows) {
     if (s === null) return;
     if (!best[r.level] || s > best[r.level]) best[r.level] = s;
   });
-  return best;
+  return Levels.applyBackfillPass(best);
 }
 function lastTsOf(rows) {
   return rows.reduce((m, r) => (scoreOf(r) !== null && r.ts > m ? r.ts : m), 0);
@@ -412,7 +412,7 @@ function summariesFromRows(rows) {
     if (!e.best[r.level] || score > e.best[r.level]) e.best[r.level] = score;
     if (r.ts > e.lastTs) e.lastTs = r.ts;
   });
-  return Object.values(by);
+  return Object.values(by).map(e => Object.assign(e, { best: Levels.applyBackfillPass(e.best) }));
 }
 
 async function loadBestSummaries(code) {
