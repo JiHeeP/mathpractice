@@ -288,13 +288,19 @@ function logAccess(code, studentNo) {
 const resultsCol = code => db.collection('classes').doc(code).collection('results');
 const bestCol = code => db.collection('classes').doc(code).collection('best');
 
-/** 한 학생의 기록만 읽는다 (studentNo 단일 필드 조건이라 색인을 따로 만들 필요 없음) */
+/** 한 학생의 기록만 읽는다 (studentNo 단일 필드 조건이라 색인을 따로 만들 필요 없음)
+ *  아직 서버에 올라가지 못하고 이 기기 보관함에 남은 기록도 합친다 — 그래야 해금·최고점이 바로 반영된다. */
 async function loadMyResults(code, studentNo) {
   const no = String(studentNo);
   return cached(`mine:${code}:${no}`, async () => {
     if (isLocal()) return LS.get(`cls.${code}.results`, []).filter(r => String(r.studentNo) === no);
     const snap = await resultsCol(code).where('studentNo', '==', no).get();
-    return snap.docs.map(d => d.data());
+    const rows = snap.docs.map(d => Object.assign({ _id: d.id }, d.data()));
+    const have = new Set(rows.map(r => r._id));
+    outbox.list().forEach(it => {
+      if (it.code === code && String(it.row.studentNo) === no && !have.has(it.id)) rows.push(Object.assign({ _id: it.id }, it.row));
+    });
+    return rows;
   }, MINE_CACHE_MS);
 }
 
@@ -316,23 +322,123 @@ async function loadAllResults(code) {
   }, ALL_CACHE_MS);
 }
 
-async function saveResult(code, payload) {
+/* ── 기록 보관함 (outbox) ──
+ * 기록은 먼저 이 기기(localStorage)에 넣고, 서버에 올라간 것이 확인되면 지운다.
+ * 와이파이가 끊기거나 탭이 닫혀도 기록이 사라지지 않고, 다음에 앱을 열 때 자동으로 다시 올린다.
+ * 문서 ID를 기기에서 미리 정해 두므로 같은 기록을 두 번 올려도 한 번만 남는다
+ * (보안 규칙이 기존 문서 수정을 막기 때문에 두 번째 쓰기는 거부되고, 그러면 '이미 올라감'으로 본다).
+ */
+const OUTBOX_KEY = 'outbox';
+const outbox = {
+  list() { const v = LS.get(OUTBOX_KEY, []); return Array.isArray(v) ? v : []; },
+  put(item) { const l = outbox.list().filter(x => x.id !== item.id); l.push(item); LS.set(OUTBOX_KEY, l.slice(-300)); },
+  drop(id) { LS.set(OUTBOX_KEY, outbox.list().filter(x => x.id !== id)); }
+};
+const sending = {};   // id → Promise (같은 기록을 동시에 두 번 보내지 않도록)
+
+function newResultId(code) {
+  if (!isLocal()) return resultsCol(code).doc().id;
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+
+/** 보관함의 기록 하나를 서버에 올린다. 올라갔거나 이미 있으면 보관함에서 지운다. */
+function sendOne(item) {
+  if (sending[item.id]) return sending[item.id];
+  const p = resultsCol(item.code).doc(item.id).set(item.row)
+    .then(() => { outbox.drop(item.id); return true; })
+    .catch(e => {
+      const c = (e && e.code) || '';
+      // permission-denied = 같은 ID 문서가 이미 있음(이전 전송이 사실은 성공) 또는 규칙 위반 → 다시 보내도 소용없다
+      if (c.includes('permission-denied') || c.includes('already-exists')) { outbox.drop(item.id); return true; }
+      console.warn('기록 전송 실패 — 보관함에 남겨 두고 다음에 다시 보냅니다', e);
+      return false;
+    })
+    .finally(() => { delete sending[item.id]; });
+  sending[item.id] = p;
+  return p;
+}
+
+/** 보관함에 남은 기록을 모두 다시 보낸다 (앱 시작 · 인터넷 복구 · 저장 직후) */
+function flushOutbox() {
+  if (isLocal()) return Promise.resolve(0);
+  const items = outbox.list();
+  if (!items.length) return Promise.resolve(0);
+  return Promise.all(items.map(sendOne)).then(r => r.filter(Boolean).length);
+}
+
+/** 기록 한 줄을 영구 저장한다 — 로컬 모드는 바로, Firestore 는 보관함 → 서버 */
+function persistRow(code, id, row) {
+  if (isLocal()) {
+    const r = LS.get(`cls.${code}.results`, []);
+    if (!r.some(x => x._id === id)) { r.push(Object.assign({ _id: id }, row)); LS.set(`cls.${code}.results`, r); }
+    return Promise.resolve(true);
+  }
+  const item = { code, id, row };
+  outbox.put(item);
+  return sendOne(item);
+}
+
+/** 방금 저장한 기록을 캐시에 덧붙인다 (캐시를 비우면 다음 화면에서 기록을 전부 다시 읽게 되므로) */
+function addToCache(code, id, row) {
+  const withId = Object.assign({ _id: id }, row);
+  const mine = cache[`mine:${code}:${String(row.studentNo)}`];
+  if (mine && !mine.data.some(r => r._id === id)) mine.data = mine.data.concat([withId]);
+  const all = cache['results:' + code];
+  if (all && !all.data.some(r => r._id === id)) all.data = [withId].concat(all.data);
+  if (mine) syncBest(code, row.studentNo, bestOf(mine.data), lastTsOf(mine.data));
+}
+
+const SAVE_WAIT_MS = 8000;   // 이 시간 안에 서버 확인이 안 오면 '기기에 임시 저장'으로 안내하고 뒤에서 계속 보낸다
+
+async function saveResult(code, payload, opts) {
   const outcome = Levels.buildScoreOutcome(payload);
-  const row = Object.assign({}, payload, { score: outcome.recordedScore, ts: Date.now(), dateKey: dateKey(new Date()) });
+  const now = (opts && opts.ts) || Date.now();
+  const row = Object.assign({}, payload, { score: outcome.recordedScore, ts: now, dateKey: dateKey(new Date(now)) });
+  if (opts && opts.recovered) row.recovered = true;
+  const id = (opts && opts.id) || newResultId(code);
+  let sent;
   try {
-    if (isLocal()) { const r = LS.get(`cls.${code}.results`, []); r.push(row); LS.set(`cls.${code}.results`, r); }
-    else await resultsCol(code).add(row);
+    const p = persistRow(code, id, row);
+    sent = await Promise.race([p, new Promise(res => setTimeout(() => res(null), SAVE_WAIT_MS))]);
   } catch (e) {
     console.warn('결과 저장 실패', e);
     return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
-  // 캐시를 통째로 비우면 다음 화면에서 기록을 전부 다시 읽게 되므로, 방금 저장한 한 줄만 덧붙인다.
-  const mine = cache[`mine:${code}:${String(row.studentNo)}`];
-  if (mine) mine.data = mine.data.concat([row]);
-  const all = cache['results:' + code];
-  if (all) all.data = [row].concat(all.data);
-  if (mine) syncBest(code, row.studentNo, bestOf(mine.data), lastTsOf(mine.data));
+  addToCache(code, id, row);
+  if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
+  if (sent !== true) {
+    return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
+             message: '인터넷이 불안정해서 이 기기에 먼저 저장했어요. 연결되면 자동으로 올라가요.' };
+  }
   return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
+}
+
+/* ── 풀던 중 기록 (draft) ──
+ * 문제를 하나 끝낼 때마다 '지금까지 푼 기록'을 기기에 적어 둔다.
+ * 끝까지 풀거나 '그만하기'를 누르면 지우고, 그 전에 탭이 닫히거나 새로고침되면(태블릿에서 다른 앱을 열었다
+ * 돌아오면 브라우저가 페이지를 다시 불러오기도 한다) 다음에 앱을 열 때 '중도 포기' 기록으로 올린다.
+ */
+const DRAFT_KEY = 'draft';
+const draft = {
+  save(code, payload) { if (code && payload && payload.studentNo != null) LS.set(DRAFT_KEY, { code, payload, at: Date.now() }); },
+  clear() { LS.del(DRAFT_KEY); }
+};
+
+/** 남아 있는 풀던 중 기록을 '중도 포기(또는 자유 연습)' 기록으로 저장한다 */
+function recoverDraft() {
+  const d = LS.get(DRAFT_KEY, null);
+  if (!d || !d.code || !d.payload || !d.payload.totalQuestions) { draft.clear(); return Promise.resolve(null); }
+  draft.clear();
+  const p = Object.assign({}, d.payload);
+  if (p.mode === 'challenge') { p.mode = 'aborted'; p.resultStatus = 'aborted'; }   // 끝까지 못 풀었으므로 점수 없음
+  // 새 ID로 저장한다 — 혹시 다른 탭에서 같은 도전을 계속 풀고 있어도 그쪽 최종 점수가 막히지 않도록
+  return saveResult(d.code, p, { ts: d.at, recovered: true }).catch(() => null);
+}
+
+/** 앱 시작 시 한 번 — 풀던 중 기록 복구 + 못 보낸 기록 재전송, 인터넷이 돌아오면 다시 시도 */
+function startBackgroundSync() {
+  recoverDraft().then(() => flushOutbox());
+  if (!isLocal()) window.addEventListener('online', () => flushOutbox());
 }
 
 /** 점수로 인정할 수 있는 기록인지 판정하고 점수를 돌려준다.
@@ -579,6 +685,7 @@ return {
   listClasses, createClass, renameClass, archiveClass, getClass, setOffDays,
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
-  saveResult, getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
+  saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
+  getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
 };
 })();

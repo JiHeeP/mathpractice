@@ -40,6 +40,7 @@ function resetStudent() {
 function boot() {
   DB.init();
   if (DB.isLocal()) $('localBanner').classList.remove('hidden');
+  DB.startBackgroundSync();   // 지난번에 풀다 끊긴 기록 · 못 보낸 기록을 다시 올린다
 
   const params = new URLSearchParams(location.search);
   if (params.get('view') === 'teacher') { Teacher.autoRoute(); return; }
