@@ -10,6 +10,7 @@ const S = {
 function start(level, mode, cfg, engine, onExit) {
   S.level = level; S.mode = mode; S.cfg = cfg; S.engine = engine; S.onExit = onExit;
   S.solved = 0; S.correct = 0; S.incorrect = 0; S.overtime = false; S.saved = false;
+  guardNavigation();
   S.startAt = Date.now();
   if (mode === 'challenge') { S.total = cfg.chalQ; S.timeLimit = cfg.chalTime; }
   else { S.total = 0; S.timeLimit = 0; }
@@ -73,7 +74,10 @@ function problemDone(ok) {
   S.solved++;
   if (ok) S.correct++; else S.incorrect++;
   updateSolved();
-  return isChallenge() && S.solved >= S.total;
+  const done = isChallenge() && S.solved >= S.total;
+  // 풀던 중 탭이 닫히거나 새로고침돼도 여기까지 푼 기록이 남도록 기기에 적어 둔다 (끝나면 saveResult/exit 가 지운다)
+  if (!done && !S.saved) DB.saveDraft(App.classCode, buildPayload());
+  return done;
 }
 
 /** 도전 완료 화면 HTML */
@@ -123,6 +127,7 @@ function buildPayload() {
 /** 도전 완료 시 결과 저장 → 점수 표시 */
 function saveResult() {
   S.saved = true;
+  DB.clearDraft();
   DB.saveResult(App.classCode, buildPayload())
     .then(showScore)
     .catch(() => showScore({ displayScore: null, scoreRecorded: false, message: '점수 저장에 실패했습니다.', isError: true }));
@@ -134,14 +139,45 @@ function showScore(r) {
   v.textContent = r && r.displayScore != null ? `${r.displayScore}점` : '기록 없음';
   n.textContent = r ? (r.message || '') : '저장 실패';
   n.className = r && r.isError ? 'text-sm font-bold text-red-500'
+              : r && r.pending ? 'text-sm font-bold text-amber-600'
               : r && r.scoreRecorded ? 'text-sm font-bold text-green-600'
               : 'text-sm font-bold text-gray-500';
 }
 
+/* ── 풀던 중 '뒤로 가기'·창 닫기 막기 ──
+ * 태블릿의 뒤로 가기(스와이프)나 브라우저 뒤로 가기를 누르면 예전에는 앱을 그냥 떠나 버려서
+ * 풀던 기록이 0건으로 사라졌다. 이제 연습을 시작할 때 기록 한 칸을 쌓아 두고,
+ * 뒤로 가기를 누르면 페이지를 떠나는 대신 '그만하기'와 똑같이 처리한다(푼 만큼 저장 → 레벨 화면).
+ * 창을 닫거나 새로고침하려 하면 브라우저가 한 번 더 묻는다(지원하는 브라우저에서만).
+ */
+let guarded = false, leavingByBack = false;
+function guardNavigation() {
+  if (!guarded) {
+    try { history.pushState({ mpSession: true }, ''); guarded = true; } catch (e) {}
+  }
+}
+window.addEventListener('popstate', () => {
+  if (!guarded) return;
+  guarded = false;                 // 쌓아 둔 칸이 이미 빠졌다
+  leavingByBack = true;
+  exit();
+  leavingByBack = false;
+});
+window.addEventListener('beforeunload', e => {
+  if (!guarded || S.saved || S.solved === 0) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
 function exit() {
   stopTimer();
+  if (guarded && !leavingByBack) {   // '그만하기'·'돌아가기'로 나갈 때는 쌓아 둔 칸을 치운다
+    guarded = false;
+    try { history.back(); } catch (e) {}
+  }
   // 자유 연습과 중도 포기한 도전도 '푼 기록'은 남긴다.
   // 둘 다 점수가 null 이라 랭킹·해금에는 영향이 없다.
+  DB.clearDraft();
   if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(App.classCode, buildPayload()).catch(() => {}); }
   const area = document.getElementById('practiceArea');
   area.classList.add('hidden'); area.innerHTML = '';
