@@ -97,7 +97,7 @@ L36(대분수 × 대분수)은 **자연수끼리·분수끼리 따로 곱한 답
 값은 맞지만 형태가 틀린 보기(예: 기약이 아닌 분수, 최소공배수가 아닌 통분)를 고르면
 무엇이 아쉬운지 따로 알려 줍니다.
 
-### 랭킹 (명예의 전당)
+### 랭킹 (교사 화면에서만 보임)
 
 학생마다 **레벨별 최고 점수를 모두 더한 합계** 순으로 나열합니다. 같은 L22를 풀었더라도
 먼저 푼 순서가 아니라 L1~L22 합계가 큰 학생이 위로 갑니다. 합계가 같으면 더 높은 레벨까지 간 학생,
@@ -273,7 +273,7 @@ students/2   { number: "2", name: "이영희", pinHash: "9f2c..." }
 index.html              모든 화면의 마크업
 css/app.css             분수 표기 · 풀이판 · 세로셈 격자 스타일
 vendor/tailwind.css     Tailwind 빌드 결과 (CDN 대신 직접 호스팅)
-vendor/chart.umd.js     Chart.js (성장 그래프)
+vendor/chart.umd.js     Chart.js (지금은 쓰지 않음 — 학생 성장 그래프를 뺐음)
 js/firebase-config.js   Firebase 설정 (직접 채우는 파일)
 js/fraction.js          분수 코어 (약분 · 사칙연산 · 대분수 변환 · 한국어 조사)
 js/decimal.js           소수 코어 (정수 스케일 연산 · 분수↔소수 변환)
