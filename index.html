@@ -127,7 +127,7 @@
     <div id="tAuthMessage" class="min-h-6 mt-3 text-sm font-bold text-red-500"></div>
     <button id="tAuthBtn" class="w-full mt-2 py-3 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.submitAuth()">로그인</button>
     <div class="flex justify-between mt-4 text-sm">
-      <button id="tAuthToggle" class="text-slate-500 underline hover:text-slate-700" onclick="Teacher.toggleMode()">처음이신가요? 가입하기</button>
+      <button id="tAuthToggle" class="text-xs text-slate-400 underline hover:text-slate-700" onclick="Teacher.toggleMode()">처음이신가요? 가입하기</button>
       <button class="text-slate-500 underline hover:text-slate-700" onclick="Teacher.resetPassword()">비밀번호 재설정</button>
     </div>
   </div>
@@ -141,8 +141,9 @@
     <button class="px-3 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-300 transition" onclick="Teacher.logout()">로그아웃</button>
   </div>
   <div id="tClassList" class="space-y-2 mb-5"><div class="text-center text-gray-500 py-4">불러오는 중...</div></div>
-  <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-    <label class="block text-xs font-bold text-slate-500 mb-1">새 반 만들기</label>
+  <details class="bg-slate-50 border border-slate-200 rounded-2xl">
+    <summary class="px-4 py-3 text-sm font-bold text-slate-500 cursor-pointer select-none">새 반 만들기</summary>
+    <div class="px-4 pb-3">
     <div class="flex gap-2">
       <input id="tNewClassName" type="text" maxlength="30" placeholder='예: 5학년 2반'
         class="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300"
@@ -150,7 +151,8 @@
       <button class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="Teacher.createClass()">만들기</button>
     </div>
     <div id="tHomeMessage" class="min-h-5 mt-2 text-sm font-bold text-red-500"></div>
-  </div>
+    </div>
+  </details>
 </div>
 
 <!-- ══ T3. 반 관리 ══ -->
@@ -166,50 +168,9 @@
   <div id="tCopyMsg" class="text-center text-sm text-emerald-600 font-bold min-h-6 mt-1 mb-2"></div>
 
   <div class="mb-4 flex flex-wrap gap-2">
-    <button id="ttab-students" class="ttab ttab-on" onclick="Teacher.switchTab('students')">학생 관리</button>
+    <button id="ttab-comparison" class="ttab ttab-on" onclick="Teacher.switchTab('comparison')">학생 비교</button>
     <button id="ttab-ranking" class="ttab" onclick="Teacher.switchTab('ranking')">랭킹</button>
-    <button id="ttab-comparison" class="ttab" onclick="Teacher.switchTab('comparison')">학생 비교</button>
-    <button id="ttab-alerts" class="ttab relative" onclick="Teacher.switchTab('alerts')">접속 감시
-      <span id="alertBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-black">0</span></button>
-    <button id="ttab-cards" class="ttab" onclick="Teacher.switchTab('cards')">접속 카드</button>
-  </div>
-
-  <!-- 학생 관리 -->
-  <div id="tpanel-students">
-    <div class="overflow-hidden rounded-xl border border-slate-300 bg-white mb-4">
-      <table class="w-full text-sm text-left text-gray-600">
-        <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
-          <th class="px-3 py-2.5 text-center w-14">번호</th><th class="px-3 py-2.5">이름</th>
-          <th class="px-3 py-2.5 text-center">PIN</th><th class="px-3 py-2.5 text-right">관리</th></tr></thead>
-        <tbody id="tStudentRows"><tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
-      </table>
-    </div>
-    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
-      <label class="block text-xs font-bold text-slate-500 mb-2">학생 추가 / 수정 <span class="font-normal">(같은 번호면 덮어씀 · PIN 비우면 기존 유지)</span></label>
-      <div class="flex flex-wrap gap-2">
-        <input id="tStuNo" type="text" maxlength="4" placeholder="번호" class="w-20 px-3 py-2.5 rounded-xl border border-slate-300 text-center"/>
-        <input id="tStuName" type="text" maxlength="20" placeholder="이름" class="flex-1 min-w-[7rem] px-3 py-2.5 rounded-xl border border-slate-300"/>
-        <input id="tStuPin" type="text" maxlength="8" placeholder="PIN(선택)" class="w-28 px-3 py-2.5 rounded-xl border border-slate-300 text-center"
-          onkeydown="if(event.key==='Enter')Teacher.saveStudent()"/>
-        <button class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="Teacher.saveStudent()">저장</button>
-      </div>
-    </div>
-    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-      <label class="block text-xs font-bold text-slate-500 mb-2">명단 한꺼번에 붙여넣기 — 한 줄에 <b>번호 이름 PIN</b> (PIN 생략 가능)</label>
-      <textarea id="tBulkText" rows="5" placeholder="1 김철수 0412&#10;2 이영희 1103&#10;3 박민수"
-        class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
-      <button class="w-full mt-2 py-2.5 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.bulkImport()">일괄 등록</button>
-    </div>
-    <div id="tStudentsMessage" class="min-h-6 mt-3 text-sm font-bold"></div>
-
-    <div class="mt-6 border-2 border-red-200 bg-red-50 rounded-2xl p-4">
-      <div class="font-black text-red-800 mb-1">⚠️ 기록 초기화</div>
-      <p class="text-sm text-red-700 mb-3">이 반 학생들의 <b>연습·도전 기록과 접속 로그를 모두 삭제</b>합니다.
-        점수·랭킹·성장 그래프가 사라지고 모든 레벨이 처음부터 다시 잠깁니다.
-        <b>학생 명단은 지워지지 않습니다.</b> 되돌릴 수 없습니다.</p>
-      <button id="tClearBtn" class="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition" onclick="Teacher.clearRecords()">기록 전체 삭제</button>
-      <div id="tClearMessage" class="min-h-6 mt-2 text-sm font-bold"></div>
-    </div>
+    <button id="ttab-settings" class="ttab" onclick="Teacher.switchTab('settings')">설정</button>
   </div>
 
   <!-- 랭킹 -->
@@ -229,7 +190,7 @@
   </div>
 
   <!-- 학생 비교 -->
-  <div id="tpanel-comparison" class="hidden">
+  <div id="tpanel-comparison">
     <div class="flex flex-wrap items-end gap-3 mb-1 p-3 bg-white rounded-xl border border-slate-200">
       <div class="flex-1 min-w-[120px]">
         <label class="block text-xs font-bold text-slate-500 mb-1">비교 기준일 <span class="font-normal">(이전 등교일)</span></label>
@@ -244,19 +205,6 @@
     </div>
     <div id="compareHint" class="flex flex-wrap items-center gap-2 px-1 mb-3 text-xs text-slate-500 min-h-5"></div>
 
-    <details id="offDaysBox" class="mb-3 bg-slate-50 border border-slate-200 rounded-xl">
-      <summary class="px-3 py-2 text-sm font-bold text-slate-600 cursor-pointer select-none">📅 등교 안 하는 날 설정 <span id="offDaysCount" class="font-normal text-slate-400"></span></summary>
-      <div class="px-3 pb-3">
-        <p class="text-xs text-slate-500 mb-2">주말과 날짜가 고정된 공휴일(신정·3·1절·어린이날·현충일·광복절·개천절·한글날·성탄절, 대체공휴일 포함)은 자동으로 뺍니다.<br/>
-          <b>설·추석·부처님오신날, 선거일, 재량휴업일, 방학</b>처럼 해마다 다른 날만 한 줄에 하나씩 적어 주세요. (예: 2026-09-24)</p>
-        <textarea id="offDaysText" rows="4" placeholder="2026-09-24&#10;2026-09-25&#10;2026-12-24  # 재량휴업일"
-          class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
-        <div class="flex items-center gap-2 mt-2">
-          <button class="px-4 py-2 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 transition" onclick="Teacher.saveOffDays()">저장</button>
-          <span id="offDaysMessage" class="text-sm font-bold"></span>
-        </div>
-      </div>
-    </details>
     <div class="overflow-hidden rounded-xl border border-slate-300 bg-white">
       <table class="w-full text-sm text-left text-gray-600">
         <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
@@ -269,16 +217,75 @@
     </div>
   </div>
 
-  <!-- 접속 감시 -->
-  <div id="tpanel-alerts" class="hidden">
-    <div id="alertsContent" class="space-y-2"><div class="text-center text-sm text-gray-500 py-4">불러오는 중...</div></div>
-  </div>
+  <!-- 설정 (학생 관리 · 접속 카드 · 등교 안 하는 날 · 기록 초기화) -->
+  <div id="tpanel-settings" class="hidden space-y-6">
+    <section>
+    <h3 class="text-sm font-black text-slate-500 mb-2">학생 관리</h3>
+    <div class="overflow-hidden rounded-xl border border-slate-300 bg-white mb-4">
+      <table class="w-full text-sm text-left text-gray-600">
+        <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>
+          <th class="px-3 py-2.5 text-center w-14">번호</th><th class="px-3 py-2.5">이름</th>
+          <th class="px-3 py-2.5 text-center">PIN</th><th class="px-3 py-2.5 text-right">관리</th></tr></thead>
+        <tbody id="tStudentRows"><tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
+      <label class="block text-xs font-bold text-slate-500 mb-2">학생 추가 / 수정 <span class="font-normal">(같은 번호면 덮어씀 · PIN 비우면 기존 유지)</span></label>
+      <div class="flex flex-wrap gap-2">
+        <input id="tStuNo" type="text" maxlength="4" placeholder="번호" class="w-20 px-3 py-2.5 rounded-xl border border-slate-300 text-center"/>
+        <input id="tStuName" type="text" maxlength="20" placeholder="이름" class="flex-1 min-w-[7rem] px-3 py-2.5 rounded-xl border border-slate-300"/>
+        <input id="tStuPin" type="text" maxlength="8" placeholder="PIN(선택)" class="w-28 px-3 py-2.5 rounded-xl border border-slate-300 text-center"
+          onkeydown="if(event.key==='Enter')Teacher.saveStudent()"/>
+        <button class="px-4 py-2.5 bg-emerald-500 text-white rounded-xl font-bold hover:bg-emerald-600 transition" onclick="Teacher.saveStudent()">저장</button>
+      </div>
+    </div>
+    <details class="bg-slate-50 border border-slate-200 rounded-2xl">
+      <summary class="px-4 py-3 text-sm font-bold text-slate-600 cursor-pointer select-none">명단 한꺼번에 붙여넣기</summary>
+      <div class="px-4 pb-3">
+      <label class="block text-xs font-bold text-slate-500 mb-2">한 줄에 <b>번호 이름 PIN</b> (PIN 생략 가능)</label>
+      <textarea id="tBulkText" rows="5" placeholder="1 김철수 0412&#10;2 이영희 1103&#10;3 박민수"
+        class="w-full px-3 py-2.5 rounded-xl border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+      <button class="w-full mt-2 py-2.5 bg-slate-700 text-white rounded-xl font-bold hover:bg-slate-800 transition" onclick="Teacher.bulkImport()">일괄 등록</button>
+      </div>
+    </details>
+    <div id="tStudentsMessage" class="min-h-6 mt-3 text-sm font-bold"></div>
+    </section>
 
-  <!-- 접속 카드 -->
-  <div id="tpanel-cards" class="hidden text-center">
+    <section class="text-center">
+    <h3 class="text-sm font-black text-slate-500 mb-2 text-left">접속 카드</h3>
     <p class="text-sm text-slate-500 mb-4">학생마다 QR과 개인 링크가 담긴 카드를 인쇄해 잘라 나눠 주세요.<br/>QR을 찍으면 반 코드 입력 없이 자기 이름 화면으로 바로 들어갑니다.</p>
     <button class="px-6 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition" onclick="Teacher.printCards()">🖨️ 접속 카드 인쇄 화면 열기</button>
     <div id="tCardsMessage" class="min-h-6 mt-3 text-sm font-bold text-red-500"></div>
+    </section>
+
+    <section>
+    <details id="offDaysBox" class="bg-slate-50 border border-slate-200 rounded-xl">
+      <summary class="px-3 py-2 text-sm font-bold text-slate-600 cursor-pointer select-none">📅 등교 안 하는 날 설정 <span id="offDaysCount" class="font-normal text-slate-400"></span></summary>
+      <div class="px-3 pb-3">
+        <p class="text-xs text-slate-500 mb-2">주말과 날짜가 고정된 공휴일(신정·3·1절·어린이날·현충일·광복절·개천절·한글날·성탄절, 대체공휴일 포함)은 자동으로 뺍니다.<br/>
+          <b>설·추석·부처님오신날, 선거일, 재량휴업일, 방학</b>처럼 해마다 다른 날만 한 줄에 하나씩 적어 주세요. (예: 2026-09-24)</p>
+        <textarea id="offDaysText" rows="4" placeholder="2026-09-24&#10;2026-09-25&#10;2026-12-24  # 재량휴업일"
+          class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="px-4 py-2 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 transition" onclick="Teacher.saveOffDays()">저장</button>
+          <span id="offDaysMessage" class="text-sm font-bold"></span>
+        </div>
+      </div>
+    </details>
+    </section>
+
+    <section>
+    <details class="border-2 border-red-200 bg-red-50 rounded-2xl">
+      <summary class="px-4 py-3 font-black text-red-800 cursor-pointer select-none">⚠️ 기록 초기화 <span class="font-normal text-sm">(되돌릴 수 없음 · 눌러서 열기)</span></summary>
+      <div class="px-4 pb-3">
+      <p class="text-sm text-red-700 mb-3">이 반 학생들의 <b>연습·도전 기록과 접속 로그를 모두 삭제</b>합니다.
+        점수·랭킹·성장 그래프가 사라지고 모든 레벨이 처음부터 다시 잠깁니다.
+        <b>학생 명단은 지워지지 않습니다.</b> 되돌릴 수 없습니다.</p>
+      <button id="tClearBtn" class="w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition" onclick="Teacher.clearRecords()">기록 전체 삭제</button>
+      <div id="tClearMessage" class="min-h-6 mt-2 text-sm font-bold"></div>
+      </div>
+    </details>
+    </section>
   </div>
 </div>
 
