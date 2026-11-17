@@ -21,7 +21,47 @@ const SCREENS = ['classEntry','studentSelection','studentPinScreen','levelSelect
 function only(...ids) {
   SCREENS.forEach(hide); ids.forEach(show);
   $('appHeader').classList.toggle('hidden', ids.includes('practiceArea'));
+  if (ids.includes('levelSelection') && state.studentNo) Update.check();
 }
+
+/* ═══ 새 버전 자동 반영 ═══
+ * 학생 기기는 탭을 며칠씩 열어 두어 새로 배포한 화면을 받지 못한다(2026-11-17 B3 입력 방향 사례).
+ * 레벨 화면이 열릴 때(최대 3분에 한 번) 앱 파일들의 ETag 를 확인해, 처음 불러온 것과 다르면 새로고침한다.
+ * 레벨 화면은 기록 저장이 끝난 뒤이므로 푼 기록은 잃지 않는다. 새로고침 뒤에는 같은 반·같은 번호로 바로 레벨 화면에 돌아온다
+ * (이 탭에서 방금 확인한 학생이므로 비밀번호는 다시 묻지 않는다. 2분 안에 한 번만). */
+const Update = (() => {
+  const GAP = 3 * 60 * 1000;
+  let base = null, last = 0, busy = false;
+  const files = () => [location.pathname || '/', 'css/app.css',
+    ...[...document.querySelectorAll('script[src]')].map(s => s.getAttribute('src')).filter(u => /^js\//.test(u))];
+  function sig() {
+    return Promise.all(files().map(u => fetch(u, { method: 'HEAD', cache: 'no-store' })
+      .then(r => r.ok ? (r.headers.get('etag') || r.headers.get('last-modified') || '') : '')
+      .catch(() => ''))).then(list => list.some(Boolean) ? list.join('|') : null);
+  }
+  function start() { sig().then(s => { base = s; last = Date.now(); }); }
+  /** force 는 테스트 전용(3분 간격 무시) */
+  function check(force) {
+    if (!base || busy || (!force && Date.now() - last < GAP)) return;
+    busy = true; last = Date.now();
+    sig().then(s => {
+      busy = false;
+      if (!s || s === base || !state.studentNo || !$('practiceArea').classList.contains('hidden')) return;
+      try { sessionStorage.setItem('mp.resume', JSON.stringify({ c: state.classCode, n: String(state.studentNo), t: Date.now() })); } catch (e) {}
+      location.reload();
+    }).catch(() => { busy = false; });
+  }
+  /** 새로고침 직후라면 { c, n } — 한 번 읽으면 지운다 */
+  function takeResume() {
+    try {
+      const r = JSON.parse(sessionStorage.getItem('mp.resume') || 'null');
+      sessionStorage.removeItem('mp.resume');
+      return r && Date.now() - r.t < 2 * 60 * 1000 ? r : null;
+    } catch (e) { return null; }
+  }
+  return { start, check, takeResume };
+})();
+let resumeNo = null;
 const titleFor = no => `${no}번 · 연산 마스터`;
 
 const remember = {
@@ -51,6 +91,9 @@ function boot() {
 
   const params = new URLSearchParams(location.search);
   if (params.get('view') === 'teacher') { Teacher.autoRoute(); return; }
+  Update.start();
+  const resume = Update.takeResume();
+  if (resume) { resumeNo = resume.n; enterClass(resume.c, resume.n, true); return; }
 
   const code = (params.get('class') || remember.get() || '').toUpperCase().trim();
   const studentParam = params.get('student') || '';
@@ -111,6 +154,7 @@ function loadStudents(studentParam) {
         resetStudent();
         state.studentNo = found.number; state.studentName = found.name;
         $('gameTitle').textContent = titleFor(found.number);
+        if (resumeNo === String(found.number)) { resumeNo = null; loadLevels(); return; }   // 새 버전 새로고침 직후
         DB.verifyStudentPin(state.classCode, found.number, '').then(r => {
           if (r.ok) loadLevels(); else goToPin();
         });
@@ -427,6 +471,7 @@ function renderRankingTable(tbodyId, list, emptyMsg) {
 
 return {
   boot,
+  checkUpdate: force => Update.check(force),   // 테스트 전용
   get classCode() { return state.classCode; },
   get className() { return state.className; },
   get studentNo() { return state.studentNo; },
