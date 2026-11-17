@@ -9,14 +9,17 @@ const S = {
   recent: [],         // 이 레벨에서 가장 최근에 푼 문제들의 정오 (이전 도전 포함)
   wasPassed: false,   // 시작할 때 이미 통과한 레벨인가
   justPassed: false,  // 이번 도전 중에 통과했는가
-  passedEarly: false  // 통과 기준을 채워 20문제 전에 판을 끝냈는가 (점수 없이 통과만 기록)
+  passedEarly: false, // 통과 기준을 채워 20문제 전에 판을 끝냈는가 (점수 없이 통과만 기록)
+  failedOut: false,   // 기초 레벨에서 틀린 개수가 한도를 넘어 판이 끝났는가 → '다시 하기'
+  runRule: false      // 기초 레벨: 앞 판과 이어 붙이지 않고 이 판 안에서만 판정
 };
 
 function start(level, mode, cfg, engine, onExit) {
   S.level = level; S.mode = mode; S.cfg = cfg; S.engine = engine; S.onExit = onExit;
   S.solved = 0; S.correct = 0; S.incorrect = 0; S.overtime = false; S.saved = false;
-  S.seq = ''; S.justPassed = false; S.passedEarly = false;
-  S.recent = mode === 'challenge' ? App.recentOf(level).slice() : [];
+  S.seq = ''; S.justPassed = false; S.passedEarly = false; S.failedOut = false;
+  S.runRule = Levels.isRunRule(level);
+  S.recent = mode === 'challenge' && !S.runRule ? App.recentOf(level).slice() : [];
   S.wasPassed = App.isPassed(level);
   guardNavigation();
   S.startAt = Date.now();
@@ -55,7 +58,9 @@ function windowHTML(level, recent, passed) {
   const n = Levels.windowCorrect(list);
   const text = passed
     ? '✅ 통과한 레벨이에요'
-    : `최근 ${w.size}문제 중 <b>${n}개</b> 정답 · ${w.need}개면 통과`;
+    : Levels.isRunRule(level)
+      ? `한 판 ${w.size}문제 중 <b>${n}개</b> 정답 · ${w.need}개면 통과 · ${Levels.failAt(level)}개 틀리면 다시`
+      : `최근 ${w.size}문제 중 <b>${n}개</b> 정답 · ${w.need}개면 통과`;
   return `<div class="pw-wrap"><div class="pw-dots">${dots}</div><div class="pw-text">${text}</div></div>`;
 }
 
@@ -122,7 +127,8 @@ function problemDone(ok) {
   }
   updateSolved();
   if (isChallenge() && S.justPassed && !S.wasPassed && S.solved < S.total) S.passedEarly = true;
-  const done = isChallenge() && (S.solved >= S.total || S.passedEarly);
+  if (isChallenge() && S.runRule && !S.justPassed && S.incorrect >= Levels.failAt(S.level)) S.failedOut = true;
+  const done = isChallenge() && (S.solved >= S.total || S.passedEarly || S.failedOut);
   // 풀던 중 탭이 닫히거나 새로고침돼도 여기까지 푼 기록이 남도록 기기에 적어 둔다 (끝나면 saveResult/exit 가 지운다)
   if (!done && !S.saved) DB.saveDraft(App.classCode, buildPayload());
   return done;
@@ -131,10 +137,20 @@ function problemDone(ok) {
 /** 도전 완료 화면 — 통과했으면 '다음 레벨로'가 큰 버튼, 아니면 '한 번 더'가 큰 버튼 */
 function finishHTML() {
   stopTimer();
+  if (S.failedOut) {
+    return `<div class="bg-white p-6 rounded-2xl border border-gray-200 text-center">
+      <div class="res-big t-no">${S.incorrect}개 틀렸어요</div>
+      <div class="mb-3 text-sm font-bold text-gray-600">이 레벨은 한 판에서 ${Levels.passWindow(S.level).need}개를 맞혀야 통과해요.<br>처음부터 다시 해 봐요!</div>
+      <div class="res-row"><span class="t-ok">⭕ ${S.correct}</span><span class="t-no">❌ ${S.incorrect}</span></div>
+      <div class="mb-4 text-sm text-gray-500"><span id="sessScoreNote">저장 중...</span><span id="sessScore" class="hidden"></span></div>
+      <div class="flex flex-col gap-3"><button onclick="Session.exit('again')" class="big-btn big-go">🔁 다시 하기</button>
+        <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
+    </div>`;
+  }
   const dur = elapsed();
   const over = S.overtime || dur > S.timeLimit;
   const next = App.levelAfter(S.level);
-  const head = S.passedEarly ? '<div class="res-big t-ok">통과! 🎉</div><div class="mb-3 text-sm font-bold t-ok">최근 문제를 거의 다 맞혀서 바로 통과했어요</div>'
+  const head = S.passedEarly ? `<div class="res-big t-ok">통과! 🎉</div><div class="mb-3 text-sm font-bold t-ok">${S.runRule ? `이번 판에서 ${S.correct}개를 맞혀서 바로 통과했어요` : '최근 문제를 거의 다 맞혀서 바로 통과했어요'}</div>`
              : S.justPassed ? '<div class="res-big t-ok">통과! 🎉</div>'
              : S.wasPassed ? '<div class="res-big t-main">잘했어요!</div>'
              : '<div class="res-big t-main">다 풀었어요!</div>';
@@ -178,6 +194,7 @@ function buildPayload() {
     // mode 를 새로 만들지 않는 까닭: 예전 화면이 남은 기기·levels.js 의 통과 계산·서버 규칙을 그대로 쓰기 위해.
     resultStatus: !isChallenge() ? 'practice'
                 : S.passedEarly ? 'passed_early'
+                : S.failedOut ? 'failed_wrong'
                 : S.solved < S.total ? 'aborted'
                 : (over ? 'failed_overtime' : 'success')
   });
@@ -198,7 +215,8 @@ function showScore(r) {
   v.textContent = r && r.displayScore != null ? `${r.displayScore}점` : '기록 없음';
   n.textContent = r ? (r.message || '') : '저장 실패';
   // 일찍 통과한 판: 저장이 정상이면 '통과 기록됨'. 점수는 20문제를 다 푼 판에만 매겨진다
-  if (S.passedEarly && r && !r.isError && !r.pending) n.textContent = '통과가 기록되었어요. 점수는 끝까지 푼 판에만 매겨져요.';
+  if (S.failedOut && r && !r.isError && !r.pending) n.textContent = '푼 문제는 기록되었어요.';
+  else if (S.passedEarly && r && !r.isError && !r.pending) n.textContent = '통과가 기록되었어요. 점수는 끝까지 푼 판에만 매겨져요.';
   n.className = r && r.isError ? 'font-bold t-no'
               : r && r.pending ? 'font-bold text-amber-600'
               : r && r.scoreRecorded ? 'font-bold t-ok'

@@ -48,7 +48,12 @@ console.log('통과 판정');
 let ts = 0;
 const row = (level, mode, seq) => ({ level, mode, seq, ts: ++ts, totalQuestions: seq.length, score: null });
 const prog = rows => L.computeProgress(rows, () => null);
-check('기초 레벨 도전: 최근 20문제 중 18개면 통과', !!prog([row('B1', 'aborted', '0111111111'), row('B1', 'challenge', '1111111101')]).passed.B1);
+check('기초: 여러 판을 이어 붙이지 않음 (9+9개 정답이어도 통과 아님)', !prog([row('B1', 'aborted', '0111111111'), row('B1', 'challenge', '1111111101')]).passed.B1);
+check('기초: 한 판에서 18개 맞히면 통과 (자동 통과 판)', !!prog([row('B1', 'aborted', '1'.repeat(18))]).passed.B1);
+check('기초: 한 판 17개는 통과 아님', !prog([row('B1', 'aborted', '1101111111111111110')]).passed.B1);
+check('기초: 레벨 화면 막대는 가장 최근 판', prog([row('B1', 'aborted', '1'.repeat(10)), row('B1', 'aborted', '001')]).recent.B1.join('') === '001');
+check('기초 판 규칙: 20문제 3개 틀리면 끝 · 10문제 2개', L.failAt('B1') === 3 && L.failAt('B4') === 2 && L.passWindow('B1').need === 18 && L.passWindow('B9').need === 9);
+check('분수 레벨은 예전처럼 이어 붙임 (9+9개 → 통과)', !!prog([row('L1', 'aborted', '111111111'), row('L1', 'aborted', '111111111')]).passed.L1);
 check('B4(10문제) 창 = 최근 10문제 중 9개', L.passWindow('B4').size === 10 && L.passWindow('B4').need === 9);
 
 console.log('문제 만들기 (레벨마다 2,000문제)');

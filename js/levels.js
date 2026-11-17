@@ -259,11 +259,22 @@ SCRATCH_LEVELS.forEach(lv => { LEVEL_CONFIGS[lv].scratch = true; });
  */
 function allowedWrong(level) { return (LEVEL_CONFIGS[level].chalQ <= 10) ? 1 : 2; }
 
-/** 통과 판정에 쓰는 '최근 문제' 창 — { size: 보는 문제 수, need: 맞혀야 하는 개수 } */
+/** 통과 판정에 쓰는 '최근 문제' 창 — { size: 보는 문제 수, need: 맞혀야 하는 개수 }
+ *  기초 레벨(판 안 규칙)은 한 판의 문제 수 그대로: 20문제 중 18개, 10문제 중 9개 */
 function passWindow(level) {
+  if (isRunRule(level)) { const size = LEVEL_CONFIGS[level].chalQ; return { size, need: size - allowedWrong(level) }; }
   const size = (LEVEL_CONFIGS[level].chalQ <= 10) ? 10 : 20;
   return { size, need: size - allowedWrong(level) };
 }
+
+/* ═══ 기초 레벨은 '한 판 안' 규칙 (선생님 결정 2026-11-17 — 완전 숙달) ═══
+ * 여러 판을 이어 붙이지 않는다. 한 판에서
+ *   20문제 레벨: 18개 맞히면 그 자리에서 통과 · 3개 틀리면 바로 끝나고 '다시 하기'
+ *   10문제 레벨(B4·B8·B9·B10): 9개 맞히면 통과 · 2개 틀리면 바로 다시 하기
+ */
+function isRunRule(level) { return !!(LEVEL_CONFIGS[level] && LEVEL_CONFIGS[level].open); }
+/** 한 판에서 이만큼 틀리면 판이 끝난다 (기초 레벨만) */
+function failAt(level) { return allowedWrong(level) + 1; }
 function windowCorrect(recent) { return (recent || []).reduce((n, v) => n + (v ? 1 : 0), 0); }
 function windowPassed(level, recent) { return windowCorrect(recent) >= passWindow(level).need; }
 
@@ -284,7 +295,11 @@ function computeProgress(rows, scoreOf) {
     if (!LEVEL_CONFIGS[lv]) return;
     if (r.mode !== 'challenge' && r.mode !== 'aborted') return;
     seen[lv] = true;
-    if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
+    if (typeof r.seq === 'string' && SEQ_RE.test(r.seq) && isRunRule(lv)) {
+      // 기초: 판마다 따로 판정. 레벨 화면 막대에는 가장 최근 판을 보여 준다
+      const run = recent[lv] = [...r.seq].map(c => (c === '1' ? 1 : 0));
+      if (!passed[lv] && windowPassed(lv, run)) passed[lv] = true;
+    } else if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
       const size = passWindow(lv).size;
       const h = recent[lv] = recent[lv] || [];
       for (let i = 0; i < r.seq.length; i++) {
@@ -429,7 +444,7 @@ function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
-  trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  trackOf, prevInTrack, nextInTrack, isRunRule, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass
