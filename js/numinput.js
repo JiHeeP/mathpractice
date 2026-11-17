@@ -14,18 +14,72 @@ function init(lv, mode, config, onExit) {
   const area = document.getElementById('practiceArea');
   area.classList.remove('hidden');
   area.innerHTML = `${Session.headerHTML()}
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
-      <div class="text-center text-xs text-gray-400 font-black mb-4 tracking-widest">${cfg.label}</div>
-      <div id="numBody"></div>
+    <div class="num-layout">
+      <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+        <div class="text-center text-xs text-gray-400 font-black mb-4 tracking-widest">${cfg.label}</div>
+        <div id="numBody"></div>
+      </div>
+      <div class="scratch">
+        <div class="scratch-head"><span>✏️ 계산 연습장</span><button id="scratchClear" class="scratch-clear">지우기</button></div>
+        <canvas id="scratchCanvas"></canvas>
+      </div>
     </div>`;
+  setWide(true);
+  Scratch.attach(document.getElementById('scratchCanvas'));
+  document.getElementById('scratchClear').onclick = () => Scratch.clear();
   Session.startTimer();
   next();
 }
+
+/** 연습장을 옆에 두려고 넓은 화면에서는 앱 틀을 넓힌다. 풀이 화면을 떠나면 원래대로 */
+function setWide(on) { document.body.classList.toggle('num-wide', on); }
+new MutationObserver(() => {
+  const area = document.getElementById('practiceArea');
+  if (area && (area.classList.contains('hidden') || !document.getElementById('scratchCanvas'))) setWide(false);
+}).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+
+/* ═══ 계산 연습장 — 손가락·펜으로 쓰는 그림판. 저장·전송하지 않는다(기록 아님). 문제가 바뀌면 지운다 ═══ */
+const Scratch = (() => {
+  let cv, ctx, drawing = false, last = null;
+  function fit() {
+    if (!cv) return;
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (!r.width) return;
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (cv.width === w && cv.height === h) return;
+    const keep = cv.width ? ctx.getImageData(0, 0, cv.width, cv.height) : null;
+    cv.width = w; cv.height = h;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#1f2937';
+    if (keep) ctx.putImageData(keep, 0, 0);
+  }
+  const pos = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  function down(e) { fit(); drawing = true; last = pos(e); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); dot(last); e.preventDefault(); }
+  function move(e) {
+    if (!drawing) return;
+    const p = pos(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; e.preventDefault();
+  }
+  function up() { drawing = false; last = null; }
+  function dot(p) { ctx.beginPath(); ctx.arc(p.x, p.y, 1.5, 0, Math.PI * 2); ctx.fillStyle = '#1f2937'; ctx.fill(); }
+  function attach(el) {
+    cv = el; ctx = cv.getContext('2d'); cv.width = 0;
+    cv.addEventListener('pointerdown', down);
+    cv.addEventListener('pointermove', move);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, up));
+    requestAnimationFrame(fit);
+  }
+  function clear() { if (!cv || !ctx) return; fit(); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore(); }
+  window.addEventListener('resize', fit);
+  return { attach, clear };
+})();
 
 function next() {
   prob = Gen.generateNumProblem(level);
   vals = prob.fields.map(() => '');
   cur = 0; waiting = false;
+  Scratch.clear();
   const hasList = prob.fields.some(f => f.list);
   document.getElementById('numBody').innerHTML = `
     <div class="text-center mb-4"><div class="quiz-q num-q">${prob.display}</div></div>
