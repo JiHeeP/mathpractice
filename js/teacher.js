@@ -1,9 +1,10 @@
-/* teacher.js — 교사 화면 (로그인 · 반 목록 · 학생 관리 · 대시보드 · 접속 카드) */
+/* teacher.js — 교사 화면 (로그인 · 반 목록 · 학생 비교 · 랭킹 · 설정[학생 관리 · 접속 카드 · 등교 안 하는 날 · 기록 초기화]) */
 const Teacher = (() => {
 const $ = id => document.getElementById(id);
 let authMode = 'signin';          // 'signin' | 'signup'
 let currentClass = null;          // { code, name }
-let currentTab = 'students';
+let currentTab = 'comparison';
+let autoOpened = false;          // 반이 하나뿐이면 로그인 직후 한 번만 바로 연다 ('← 내 반'으로 돌아왔을 땐 열지 않음)
 let compareAuto = true;           // 비교 기준일을 '이전 등교일'로 자동 설정 중인가
 
 /* ═══ 라우팅 ═══ */
@@ -52,7 +53,7 @@ function resetPassword() {
 }
 
 function logout() {
-  DB.auth.signOut().then(() => { currentClass = null; showLogin(); });
+  DB.auth.signOut().then(() => { currentClass = null; autoOpened = false; showLogin(); });
 }
 
 /* ═══ 교사 홈 (반 목록) ═══ */
@@ -69,6 +70,8 @@ function showHome() {
       wrap.innerHTML = '<div class="text-center text-gray-400 py-4 text-sm">아직 반이 없어요. 아래에서 첫 반을 만들어 보세요!</div>';
       return;
     }
+    if (list.length === 1 && !autoOpened) { autoOpened = true; openClass(list[0]); return; }
+    autoOpened = true;
     list.forEach(c => {
       const b = document.createElement('button');
       b.className = 'w-full flex items-center justify-between px-4 py-3.5 bg-white border-2 border-slate-200 rounded-2xl hover:bg-slate-50 hover:border-slate-400 transition text-left';
@@ -101,7 +104,7 @@ function openClass(c) {
   $('tClassName').textContent = c.name;
   $('tClassCode').textContent = c.code;
   $('tCopyMsg').textContent = '';
-  switchTab('students');
+  switchTab('comparison');
 }
 function backHome() { currentClass = null; showHome(); }
 
@@ -119,14 +122,13 @@ function copyLink() {
 
 function switchTab(tab) {
   currentTab = tab;
-  ['students','ranking','comparison','alerts','cards'].forEach(t => {
+  ['comparison','ranking','settings'].forEach(t => {
     $(`tpanel-${t}`).classList.toggle('hidden', t !== tab);
     $(`ttab-${t}`).classList.toggle('ttab-on', t === tab);
   });
-  if (tab === 'students') loadStudents();
+  if (tab === 'settings') { loadStudents(); renderOffDays(); }
   if (tab === 'ranking') loadRanking();
   if (tab === 'comparison') { initCompareDates(); loadComparison(); }
-  if (tab === 'alerts') loadAlerts();
 }
 
 /* ═══ 학생 관리 ═══ */
@@ -312,28 +314,6 @@ function loadComparison() {
       tb.appendChild(tr);
     });
   }).catch(() => { tb.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-red-500">불러오기 실패</td></tr>'; });
-}
-
-function loadAlerts() {
-  const wrap = $('alertsContent'), badge = $('alertBadge');
-  wrap.innerHTML = '<div class="text-center text-sm text-gray-500 py-4">불러오는 중...</div>';
-  DB.getAccessAlerts(currentClass.code).then(alerts => {
-    if (!alerts.length) {
-      badge.classList.add('hidden');
-      wrap.innerHTML = `<div class="text-center py-6"><div class="text-3xl mb-2">✅</div>
-        <div class="text-sm font-bold text-green-600">이상 접속이 감지되지 않았습니다.</div>
-        <div class="text-xs text-gray-400 mt-1">최근 24시간 기준</div></div>`;
-      return;
-    }
-    badge.textContent = alerts.length;
-    badge.classList.remove('hidden');
-    wrap.innerHTML = alerts.map(a => `
-      <div class="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-xl">
-        <div class="text-red-500 text-xl mt-0.5">⚠️</div>
-        <div><div class="font-bold text-red-800">${esc(a.message)}</div>
-        <div class="text-xs text-red-500 mt-1">최근 24시간 내 총 ${a.count}회 접속</div></div>
-      </div>`).join('');
-  }).catch(() => { wrap.innerHTML = '<div class="text-center text-red-500 py-4 text-sm">불러오기 실패</div>'; });
 }
 
 /* ═══ 접속 카드 인쇄 ═══ */
