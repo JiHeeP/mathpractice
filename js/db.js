@@ -315,6 +315,28 @@ async function loadMyResults(code, studentNo) {
   }, MINE_CACHE_MS);
 }
 
+/** 기초 연산(B1~B10) 기록만 읽어 학생별 통과 현황을 만든다 — 교사 화면 '기초 연산' 탭.
+ *  level 'in' 조건 하나라 따로 색인이 필요 없고, 반 전체 기록을 읽지 않아 읽기 수가 적다.
+ *  돌려주는 값: { '번호': { passed:{B1:true}, recent:{B1:[1,0,..]}, solved:{B1:푼 문제 수}, lastTs } } */
+async function getBasicProgress(code, force) {
+  if (force) delete cache['basic:' + code];
+  return cached('basic:' + code, async () => {
+    let rows;
+    if (isLocal()) rows = LS.get(`cls.${code}.results`, []).filter(r => Levels.BASIC_ORDER.indexOf(r.level) !== -1);
+    else rows = (await resultsCol(code).where('level', 'in', Levels.BASIC_ORDER).get()).docs.map(d => d.data());
+    const by = {};
+    rows.forEach(r => { const no = String(r.studentNo); (by[no] = by[no] || []).push(r); });
+    const out = {};
+    Object.keys(by).forEach(no => {
+      const p = Levels.computeProgress(by[no], scoreOf);
+      const solved = {};
+      by[no].forEach(r => { if (r.mode === 'challenge' || r.mode === 'aborted') solved[r.level] = (solved[r.level] || 0) + (Number(r.totalQuestions) || 0); });
+      out[no] = { passed: p.passed, recent: p.recent, solved, lastTs: Math.max(...by[no].map(r => r.ts || 0)) };
+    });
+    return out;
+  }, RANK_CACHE_MS);
+}
+
 /** 반 전체 기록 — 1000건씩 끝까지 나눠 읽는다 (예전의 3000건 상한 없음). 교사 화면 전용 */
 async function loadAllResults(code) {
   return cached('results:' + code, async () => {
@@ -738,6 +760,6 @@ return {
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
-  getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
+  getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getBasicProgress, getAccessAlerts, clearRecords
 };
 })();

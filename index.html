@@ -139,8 +139,25 @@
 
   <div class="mb-4 flex flex-wrap gap-2">
     <button id="ttab-comparison" class="ttab ttab-on" onclick="Teacher.switchTab('comparison')">학생 비교</button>
+    <button id="ttab-basic" class="ttab" onclick="Teacher.switchTab('basic')">기초 연산</button>
     <button id="ttab-ranking" class="ttab" onclick="Teacher.switchTab('ranking')">랭킹</button>
     <button id="ttab-settings" class="ttab" onclick="Teacher.switchTab('settings')">설정</button>
+  </div>
+
+  <!-- 기초 연산 통과 현황 -->
+  <div id="tpanel-basic" class="hidden">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <p class="text-xs text-slate-500"><b class="text-emerald-700">✓</b> 통과 · <b class="text-slate-400">⤼</b> 시작점 앞(건너뜀) · <b>7/20</b> 최근 문제 중 정답 수 · <span class="bb-now px-1">테두리</span> 지금 할 레벨 · 빈칸 아직 안 풂.
+        시작점은 설정 탭에서 정합니다.</p>
+      <button class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition whitespace-nowrap" onclick="Teacher.loadBasic(true)">새로 고침</button>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-slate-300 bg-white">
+      <table class="bb-table w-full text-sm text-gray-700">
+        <thead id="tBasicHead"></thead>
+        <tbody id="tBasicBody"><tr><td class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="tBasicSummary" class="mt-2 text-xs text-slate-500"></div>
   </div>
 
   <!-- 랭킹 -->

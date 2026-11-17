@@ -89,5 +89,12 @@ check('다시 글로 바꾸면 같은 내용', L.parseBasicStart(L.formatBasicSt
 const r2 = L.parseBasicStart('3 B2 B2 B6\n홍길동 B1 B2 B6\n4 B1 B3\n5 - B4 B7 마');
 check('잘못된 줄 4개 모두 오류로 알려 줌', r2.errors.length === 4 && Object.keys(r2.map).length === 0);
 
+const st = r1.map['3'];   // 3 B1 B2 B6 가
+check('시작점 앞 레벨: B5 건너뜀, B6·B2 아님, 약수배수는 안 건너뜀', L.basicSkipped(st, 'B5') && !L.basicSkipped(st, 'B6') && !L.basicSkipped(st, 'B2') && !L.basicSkipped(st, 'B9'));
+check("'-' 줄은 전부 건너뜀 (6번 곱셈·나눗셈)", ['B1','B2','B3','B4','B5','B8'].every(lv => L.basicSkipped(r1.map['6'], lv)));
+check('다음 기초 레벨: B1 → (B1 통과) B2 → 다 통과하면 B9', L.nextBasicLevel(st, {}) === 'B1' && L.nextBasicLevel(st, { B1: true }) === 'B2'
+  && L.nextBasicLevel(st, { B1: true, B2: true, B3: true, B4: true, B6: true, B7: true, B8: true }) === 'B9');
+check('시작점이 없으면 다음 기초 레벨도 없음', L.nextBasicLevel(null, {}) === null);
+
 console.log(fails ? `\n${fails}개 실패` : '\n모두 통과');
 process.exit(fails ? 1 : 0);

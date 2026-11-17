@@ -405,6 +405,21 @@ function parseBasicStart(text) {
   });
   return { map, errors };
 }
+/** 시작점 앞이거나 '-'(통과)로 정한 줄의 레벨인가. start = basicStart[번호] (없으면 false) */
+function basicSkipped(start, lv) {
+  if (!start) return false;
+  const line = Object.keys(BASIC_LINES).find(k => BASIC_LINES[k].indexOf(lv) !== -1);
+  if (!line || line === 'fm') return false;
+  const st = start[line];
+  if (st === '-') return true;
+  const list = BASIC_LINES[line];
+  return list.indexOf(st) > list.indexOf(lv);
+}
+/** 기초 트랙에서 다음에 할 레벨 — 시작점이 있을 때만. 뺄셈 → 곱셈 → 나눗셈 → 약수와 배수 순 */
+function nextBasicLevel(start, passed) {
+  if (!start) return null;
+  return BASIC_ORDER.find(lv => !(passed && passed[lv]) && !basicSkipped(start, lv)) || null;
+}
 function formatBasicStart(map) {
   return Object.keys(map || {}).sort((a, b) => Number(a) - Number(b))
     .map(no => { const e = map[no]; return [no, e.sub, e.mul, e.div, e.g || ''].join(' ').trim(); }).join('\n');
@@ -414,7 +429,7 @@ function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
-  trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass

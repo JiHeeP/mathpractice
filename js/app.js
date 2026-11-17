@@ -230,22 +230,9 @@ function levelAfter(lv) { return L.nextInTrack(lv); }
  * 약수와 배수(B9·B10)는 모두가 거친다. 묶음 g: 가 = 기초만(B3 통과 전까지), 나 = 기초 먼저, 다·라 = 분수 먼저
  */
 const myStart = () => state.basicStart[String(state.studentNo)] || null;
-/** 시작점 앞이거나 '통과'로 정한 줄의 레벨 — 칩을 흐리게 보여 준다(그래도 누르면 풀 수 있다) */
-function isSkippedByStart(lv) {
-  const p = myStart(); if (!p) return false;
-  const line = Object.keys(L.BASIC_LINES).find(k => L.BASIC_LINES[k].indexOf(lv) !== -1);
-  if (!line || line === 'fm') return false;
-  const st = p[line];
-  if (st === '-') return true;
-  const list = L.BASIC_LINES[line];
-  return list.indexOf(st) > list.indexOf(lv);
-}
+const isSkippedByStart = lv => L.basicSkipped(myStart(), lv);
 const doneBasic = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
-/** 기초 트랙에서 할 것 — 시작점이 있는 학생만. 뺄셈 → 곱셈 → 나눗셈 → 약수와 배수 순 */
-function nextBasic() {
-  if (!myStart()) return null;
-  return L.BASIC_ORDER.find(lv => !doneBasic(lv)) || null;
-}
+const nextBasic = () => L.nextBasicLevel(myStart(), state.progress.passed);
 /** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐) */
 function todayLevels() {
   const b = nextBasic(), f = nextLevel(), p = myStart();
