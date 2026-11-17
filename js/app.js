@@ -6,6 +6,7 @@ const state = {
   classCode: null, className: '',
   studentNo: null, studentName: '',
   level: null, bestScores: {}, chart: null,
+  progress: { passed: {}, recent: {} },   // 통과한 레벨 · 레벨별 최근 문제 정오 (규칙은 levels.js)
   loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
 };
 
@@ -23,7 +24,7 @@ const remember = {
   clear() { try { localStorage.removeItem('mp.lastClass'); } catch (e) {} }
 };
 
-/** 마지막으로 서버에서 확인한 레벨 최고점 — 기록 읽기가 실패했을 때만 꺼내 쓴다 */
+/** 마지막으로 서버에서 확인한 레벨 최고점·통과 여부 — 기록 읽기가 실패했을 때만 꺼내 쓴다 */
 const bestBackup = {
   key() { return `mp.best.${state.classCode}.${state.studentNo}`; },
   get() { try { return JSON.parse(localStorage.getItem(bestBackup.key())) || null; } catch (e) { return null; } },
@@ -33,7 +34,7 @@ const bestBackup = {
 /** 학생이 바뀌면 앞 학생의 점수를 지운다 — 같은 기기에서 읽기에 실패했을 때 앞 학생 점수가 보이지 않도록 */
 function resetStudent() {
   state.studentNo = null; state.studentName = '';
-  state.bestScores = {}; state.loadFailed = false;
+  state.bestScores = {}; state.progress = { passed: {}, recent: {} }; state.loadFailed = false;
 }
 
 /* ═══ 부팅 ═══ */
@@ -179,12 +180,28 @@ function loadLevels() {
 /** 최고점 읽기. 실패하면 빈 기록으로 덮지 않는다 — 화면에 있던 점수나 기기 백업을 그대로 쓴다.
  *  (예전에는 실패 = 빈 기록이라, Firestore 읽기 한도가 바닥나면 다 푼 학생도 '초기화'된 것처럼 보였다) */
 function fetchBestScores() {
-  return DB.getBestScores(state.classCode, state.studentNo)
-    .then(s => { state.bestScores = s || {}; state.loadFailed = false; bestBackup.set(state.bestScores); })
+  return DB.getProgress(state.classCode, state.studentNo)
+    .then(p => {
+      state.bestScores = p.best || {};
+      state.progress = { passed: p.passed || {}, recent: p.recent || {} };
+      state.loadFailed = false;
+      bestBackup.set({ best: state.bestScores, passed: state.progress.passed, recent: state.progress.recent });
+    })
     .catch(err => {
       console.warn('기록 읽기 실패', err);
       state.loadFailed = true;
-      if (!Object.keys(state.bestScores).length) state.bestScores = bestBackup.get() || {};
+      if (Object.keys(state.bestScores).length) return;
+      const b = bestBackup.get() || {};
+      if (b.best && b.passed) {
+        state.bestScores = b.best;
+        state.progress = { passed: b.passed, recent: b.recent || {} };
+      } else {
+        // 예전 형식의 백업(레벨 최고점만) — 예전 규칙의 통과 점수로 통과 여부를 되살린다
+        state.bestScores = b;
+        const passed = {};
+        Object.keys(b).forEach(lv => { if (L.LEVEL_CONFIGS[lv] && b[lv] >= L.unlockThreshold(lv)) passed[lv] = true; });
+        state.progress = { passed, recent: {} };
+      }
     });
 }
 
@@ -211,7 +228,8 @@ function renderLevelButtons() {
   L.LEVEL_ORDER.forEach(lv => {
     const cfg = L.LEVEL_CONFIGS[lv], t = cfg.theme;
     const max = L.LEVEL_MAX[lv], best = state.bestScores[lv] || 0;
-    const unlocked = L.isLevelUnlocked(lv, state.bestScores);
+    const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
+    const passed = !!state.progress.passed[lv];
 
     if (cfg.group !== group) {
       group = cfg.group;
@@ -223,9 +241,15 @@ function renderLevelButtons() {
       container.appendChild(section);
     }
 
-    const badge = best >= max
+    const scoreBadge = best >= max
       ? '<span class="lv-badge bg-green-100 text-green-700">✅ 만점</span>'
       : best > 0 ? `<span class="lv-badge bg-yellow-100 text-yellow-700">최고 ${best}점</span>` : '';
+    // 통과 표시 — 만점 배지가 있으면 겹치지 않게 생략. 아직 통과 전이면 최근 문제에서 맞힌 개수를 보여 준다
+    const w = L.passWindow(lv), rec = state.progress.recent[lv] || [];
+    const passBadge = passed
+      ? (best >= max ? '' : '<span class="lv-badge bg-green-100 text-green-700">통과</span>')
+      : rec.length ? `<span class="lv-badge bg-gray-200 text-gray-500">최근 ${L.windowCorrect(rec)}/${w.need}</span>` : '';
+    const badge = scoreBadge + passBadge;
     const lock = unlocked ? '' : '<span class="lv-badge bg-gray-200 text-gray-500">🔒 도전 잠김</span>';
     const kind = cfg.engine === 'choice' ? '⚡ 4지선다' : '📝 단계 풀이';
 
@@ -244,7 +268,7 @@ function selectLevel(lv) {
   $('modeTitle').textContent = `${lv} — ${cfg.label}`;
   $('modeDesc').textContent = cfg.desc;
 
-  const unlocked = L.isLevelUnlocked(lv, state.bestScores);
+  const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
   const btn = $('challengeBtn'), title = $('challengeTitle'), info = $('challengeInfo');
   if (unlocked) {
     btn.disabled = false;
@@ -252,17 +276,18 @@ function selectLevel(lv) {
     btn.className = 'w-full py-5 bg-red-50 border-2 border-red-200 rounded-2xl hover:bg-red-100 hover:border-red-400 transition text-left px-5';
     title.textContent = '🔥 도전 연습';
     title.className = 'text-lg font-black text-red-800';
-    info.textContent = `${cfg.chalQ}문제 · 제한시간 ${cfg.chalTime}초 · 점수 기록됨`;
+    info.innerHTML = `${cfg.chalQ}문제 · 제한시간 ${cfg.chalTime}초 · 점수 기록됨
+      <div class="mt-2">${Session.windowHTML(lv, state.progress.recent[lv] || [], !!state.progress.passed[lv])}</div>
+      <div class="text-xs mt-1">그만두고 다시 시작해도 틀린 문제는 그대로 남아요. 계속 풀어서 채워 보세요!</div>`;
     info.className = 'text-sm text-red-600 mt-1';
   } else {
-    const prev = L.getPrevLevelInfo(lv, state.bestScores);
+    const prev = L.getPrevLevelInfo(lv, state.progress);
     btn.disabled = true;
     btn.onclick = null;
     btn.className = 'w-full py-5 bg-gray-100 border-2 border-gray-200 rounded-2xl text-left px-5 opacity-60 cursor-not-allowed';
     title.textContent = '🔒 도전 연습 (잠김)';
     title.className = 'text-lg font-black text-gray-400';
-    const goal = prev.need >= prev.max ? `만점(${prev.max}점)` : `${prev.need}점`;
-    info.textContent = `${prev.level} ${goal}에 도달해야 열려요 — 현재 ${prev.best}점`;
+    info.textContent = `${prev.level} 도전에서 최근 ${prev.size}문제 중 ${prev.need}개를 맞히면 열려요 — 지금 ${prev.correct}개`;
     info.className = 'text-sm text-gray-400 mt-1';
   }
 
@@ -345,6 +370,8 @@ return {
   get className() { return state.className; },
   get studentNo() { return state.studentNo; },
   get studentName() { return state.studentName; },
+  recentOf(lv) { return state.progress.recent[lv] || []; },
+  isPassed(lv) { return !!state.progress.passed[lv]; },
   only, showClassEntry, submitClassCode, leaveClass,
   goToPin, submitStudentPin, backToStudents,
   selectLevel, startPractice, backToLevels, retryLoadLevels,

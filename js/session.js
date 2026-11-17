@@ -4,12 +4,19 @@ const S = {
   level: null, mode: null, cfg: null, engine: null,
   solved: 0, correct: 0, incorrect: 0,
   total: 0, timeLimit: 0, startAt: 0, timer: null, overtime: false,
-  saved: false, onExit: null
+  saved: false, onExit: null,
+  seq: '',            // 이번 도전에서 푼 문제의 정오 ('1101…') — 통과 판정(최근 문제 창)에 쓴다
+  recent: [],         // 이 레벨에서 가장 최근에 푼 문제들의 정오 (이전 도전 포함)
+  wasPassed: false,   // 시작할 때 이미 통과한 레벨인가
+  justPassed: false   // 이번 도전 중에 통과했는가
 };
 
 function start(level, mode, cfg, engine, onExit) {
   S.level = level; S.mode = mode; S.cfg = cfg; S.engine = engine; S.onExit = onExit;
   S.solved = 0; S.correct = 0; S.incorrect = 0; S.overtime = false; S.saved = false;
+  S.seq = ''; S.justPassed = false;
+  S.recent = mode === 'challenge' ? App.recentOf(level).slice() : [];
+  S.wasPassed = App.isPassed(level);
   guardNavigation();
   S.startAt = Date.now();
   if (mode === 'challenge') { S.total = cfg.chalQ; S.timeLimit = cfg.chalTime; }
@@ -29,7 +36,29 @@ function headerHTML() {
     <div class="text-sm text-gray-500 font-bold whitespace-nowrap">풀이 <span class="text-indigo-600 text-lg" id="sessSolved">${counter}</span></div>
     ${timer}
     <button class="px-3 py-2 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition text-sm whitespace-nowrap" onclick="Session.exit()">그만하기</button>
-  </div>`;
+  </div>${isChallenge() ? `<div id="sessWindow" class="mb-3">${windowHTML(S.level, S.recent, S.wasPassed || S.justPassed)}</div>` : ''}`;
+}
+
+/** '최근 문제' 막대 — 맞힌 문제는 초록, 틀린 문제는 빨강, 아직 안 푼 칸은 회색.
+ *  그만두고 다시 시작해도 이 막대는 그대로 이어진다. */
+function windowHTML(level, recent, passed) {
+  const w = Levels.passWindow(level);
+  const list = (recent || []).slice(-w.size);
+  let dots = '';
+  for (let i = 0; i < w.size; i++) {
+    const v = list[i];
+    dots += `<span class="pw-dot ${v === undefined ? '' : v ? 'pw-ok' : 'pw-no'}"></span>`;
+  }
+  const n = Levels.windowCorrect(list);
+  const text = passed
+    ? '✅ 통과한 레벨이에요'
+    : `최근 ${w.size}문제 중 <b>${n}개</b> 정답 · ${w.need}개면 통과`;
+  return `<div class="pw-wrap"><div class="pw-dots">${dots}</div><div class="pw-text">${text}</div></div>`;
+}
+
+function updateWindow() {
+  const el = document.getElementById('sessWindow');
+  if (el) el.innerHTML = windowHTML(S.level, S.recent, S.wasPassed || S.justPassed);
 }
 
 function updateSolved() {
@@ -73,6 +102,14 @@ function penalize(sec) {
 function problemDone(ok) {
   S.solved++;
   if (ok) S.correct++; else S.incorrect++;
+  if (isChallenge()) {
+    S.seq += ok ? '1' : '0';
+    S.recent.push(ok ? 1 : 0);
+    const size = Levels.passWindow(S.level).size;
+    if (S.recent.length > size) S.recent.shift();
+    if (!S.wasPassed && !S.justPassed && Levels.windowPassed(S.level, S.recent)) S.justPassed = true;
+    updateWindow();
+  }
   updateSolved();
   const done = isChallenge() && S.solved >= S.total;
   // 풀던 중 탭이 닫히거나 새로고침돼도 여기까지 푼 기록이 남도록 기기에 적어 둔다 (끝나면 saveResult/exit 가 지운다)
@@ -92,6 +129,7 @@ function finishHTML() {
     <h2 class="text-2xl font-black text-blue-600 mb-2">도전 완료!</h2>
     <p class="text-gray-500 mb-4">${App.studentName} 학생, 수고했어요!</p>
     ${badge}
+    ${S.justPassed ? '<div class="mb-3 rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-sm font-black text-green-700">🎉 통과! 다음 레벨 도전이 열렸어요</div>' : ''}
     <div class="space-y-2 mb-4 text-left max-w-xs mx-auto">
       <div class="flex justify-between p-2 bg-green-50 rounded-lg"><span class="text-green-600 font-bold">정답</span><span class="font-black text-green-700">${S.correct}개</span></div>
       <div class="flex justify-between p-2 bg-red-50 rounded-lg"><span class="text-red-500 font-bold">오답</span><span class="font-black text-red-600">${S.incorrect}개</span></div>
@@ -107,7 +145,8 @@ function finishHTML() {
 function buildPayload() {
   const dur = elapsed();
   const over = isChallenge() && (S.overtime || dur > S.timeLimit);
-  return {
+  const seq = isChallenge() && S.seq ? { seq: S.seq } : {};
+  return Object.assign(seq, {
     studentNo: App.studentNo,
     level: S.level,
     mode: !isChallenge() ? 'free' : (S.solved >= S.total ? 'challenge' : 'aborted'),
@@ -121,7 +160,7 @@ function buildPayload() {
     resultStatus: !isChallenge() ? 'practice'
                 : S.solved < S.total ? 'aborted'
                 : (over ? 'failed_overtime' : 'success')
-  };
+  });
 }
 
 /** 도전 완료 시 결과 저장 → 점수 표시 */
@@ -176,7 +215,7 @@ function exit() {
     try { history.back(); } catch (e) {}
   }
   // 자유 연습과 중도 포기한 도전도 '푼 기록'은 남긴다.
-  // 둘 다 점수가 null 이라 랭킹·해금에는 영향이 없다.
+  // 둘 다 점수가 null 이라 랭킹에는 영향이 없다. 중도 포기한 도전의 문제별 정오(seq)는 통과 판정에 그대로 들어간다.
   DB.clearDraft();
   if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(App.classCode, buildPayload()).catch(() => {}); }
   const area = document.getElementById('practiceArea');
@@ -187,6 +226,6 @@ function exit() {
 window.Session = {
   state: S, start, isChallenge, elapsed,
   headerHTML, updateSolved, startTimer, stopTimer, penalize,
-  problemDone, finishHTML, saveResult, exit
+  problemDone, finishHTML, saveResult, exit, windowHTML
 };
 })();

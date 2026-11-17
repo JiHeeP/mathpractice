@@ -399,12 +399,14 @@ async function saveResult(code, payload, opts) {
   let sent;
   try {
     const p = persistRow(code, id, row);
+    // 서버 확인을 기다리기 전에 캐시에 먼저 덧붙인다 — '그만하기' 직후 레벨 화면에도 방금 푼 문제가 바로 반영되도록
+    // (기록은 이미 기기 보관함에 들어 있어 전송이 늦어져도 사라지지 않는다)
+    addToCache(code, id, row);
     sent = await Promise.race([p, new Promise(res => setTimeout(() => res(null), SAVE_WAIT_MS))]);
   } catch (e) {
     console.warn('결과 저장 실패', e);
     return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
-  addToCache(code, id, row);
   if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
   if (sent !== true) {
     return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
@@ -489,6 +491,15 @@ async function getBestScores(code, studentNo) {
   const best = bestOf(rows);
   syncBest(code, studentNo, best, lastTsOf(rows));
   return best;
+}
+
+/** 레벨 화면용 — 최고점 + 통과 여부 + 레벨별 최근 문제 정오 (규칙은 levels.js computeProgress) */
+async function getProgress(code, studentNo) {
+  const rows = await loadMyResults(code, studentNo);
+  const best = bestOf(rows);
+  syncBest(code, studentNo, best, lastTsOf(rows));
+  const p = Levels.computeProgress(rows, scoreOf);
+  return { best, passed: p.passed, recent: p.recent };
 }
 
 async function getHistory(code, studentNo) {
@@ -686,6 +697,6 @@ return {
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
-  getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
+  getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
 };
 })();
