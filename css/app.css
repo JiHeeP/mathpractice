@@ -139,3 +139,25 @@
 .sx-free{font-size:.75rem;font-weight:800;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9999px;padding:.15rem .6rem;white-space:nowrap}
 .res-big{font-size:1.9rem;font-weight:900;margin-bottom:.5rem}
 .res-row{display:flex;justify-content:center;gap:1.2rem;font-size:1.1rem;font-weight:900;margin-bottom:.75rem;font-variant-numeric:tabular-nums}
+/* 기초 연산 — 숫자 직접 입력 (js/numinput.js) */
+.num-q{font-size:2.2rem;gap:.15rem;word-break:keep-all}
+.num-q span:only-child{font-size:1.5rem;line-height:1.4}
+@media(max-width:420px){.num-q{font-size:1.7rem}}
+.num-fields{display:flex;justify-content:center;gap:.6rem;flex-wrap:wrap}
+.num-field{min-width:8rem;max-width:100%;flex:1 1 8rem;min-height:3.6rem;padding:.4rem .8rem;border:3px solid #e5e7eb;border-radius:1rem;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.num-field.on{border-color:#6366f1;background:#eef2ff}
+.num-field.ok{border-color:#22c55e;background:#f0fdf4}
+.num-field.no{border-color:#ef4444;background:#fef2f2}
+.num-lbl{font-size:.75rem;font-weight:800;color:#6b7280}
+.num-val{font-size:1.8rem;font-weight:900;color:#1f2937;font-variant-numeric:tabular-nums;min-height:2.2rem;word-break:break-all}
+.num-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.6rem;max-width:22rem;margin-left:auto;margin-right:auto}
+.num-key{padding:.85rem 0;border-radius:.9rem;background:#f3f4f6;font-size:1.5rem;font-weight:900;color:#1f2937;transition:.1s}
+.num-key:active{transform:scale(.96);background:#e5e7eb}
+.num-del{color:#6b7280}
+.num-ok{grid-column:1/-1;background:#ea580c;color:#fff;font-size:1.25rem}
+.num-ok:active{background:#c2410c}
+.lv-chip.skip{background:#f8fafc;color:#94a3b8;border-color:#e2e8f0;border-style:dashed}
+.lv-track{font-size:1rem;font-weight:900;color:#1f2937;margin-top:.4rem;padding:0 .15rem}
+.next-sub{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid #fed7aa;border-radius:.9rem;padding:.55rem .75rem;font-size:.95rem;font-weight:800;color:#7c2d12;text-align:left}
+.next-sub b{color:#ea580c}
+.skip-btn{display:block;width:100%;padding:.7rem;border-radius:1rem;font-size:1rem;font-weight:900;text-align:center;background:#f8fafc;color:#334155;border:2px dashed #94a3b8}

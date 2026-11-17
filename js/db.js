@@ -143,12 +143,14 @@ async function listClasses() {
   if (isLocal()) {
     const all = LS.get('classes', {});
     return Object.entries(all).filter(([, c]) => c.teacherUid === me.uid && !c.archived)
-      .map(([code, c]) => ({ code, name: c.name, offDays: offDaysOf(c) }));
+      .map(([code, c]) => ({ code, name: c.name, offDays: offDaysOf(c), basicStart: basicStartOf(c) }));
   }
   const snap = await db.collection('classes').where('teacherUid', '==', me.uid).get();
-  return snap.docs.filter(d => !d.data().archived).map(d => ({ code: d.id, name: d.data().name, offDays: offDaysOf(d.data()) }));
+  return snap.docs.filter(d => !d.data().archived).map(d => ({ code: d.id, name: d.data().name, offDays: offDaysOf(d.data()), basicStart: basicStartOf(d.data()) }));
 }
 function offDaysOf(data) { return Array.isArray(data && data.offDays) ? data.offDays.map(String) : []; }
+/** 번호별 기초 트랙 시작점 { '번호': { sub, mul, div, g } } — levels.js parseBasicStart 참고 */
+function basicStartOf(data) { const m = data && data.basicStart; return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; }
 
 async function createClass(name) {
   const me = auth.current();
@@ -186,6 +188,14 @@ async function setOffDays(code, offDays) {
   return list;
 }
 
+/** 번호별 기초 트랙 시작점 저장 — 교사 화면 설정. 반 문서의 필드 하나라 보안 규칙(validClass: 필드 6개 이하)을 바꾸지 않아도 된다 */
+async function setBasicStart(code, map) {
+  if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].basicStart = map; LS.set('classes', all); } }
+  else await db.collection('classes').doc(code).update({ basicStart: map });
+  invalidate();
+  return map;
+}
+
 async function archiveClass(code) {
   if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].archived = true; LS.set('classes', all); } }
   else await db.collection('classes').doc(code).update({ archived: true });
@@ -197,11 +207,11 @@ async function getClass(code) {
   return cached('class:' + code, async () => {
     if (isLocal()) {
       const c = (LS.get('classes', {}))[code];
-      return c && !c.archived ? { code, name: c.name, teacherUid: c.teacherUid, offDays: offDaysOf(c) } : null;
+      return c && !c.archived ? { code, name: c.name, teacherUid: c.teacherUid, offDays: offDaysOf(c), basicStart: basicStartOf(c) } : null;
     }
     const doc = await db.collection('classes').doc(code).get();
     if (!doc.exists || doc.data().archived) return null;
-    return { code, name: doc.data().name, teacherUid: doc.data().teacherUid, offDays: offDaysOf(doc.data()) };
+    return { code, name: doc.data().name, teacherUid: doc.data().teacherUid, offDays: offDaysOf(doc.data()), basicStart: basicStartOf(doc.data()) };
   });
 }
 
@@ -539,6 +549,7 @@ async function getHistory(code, studentNo) {
     .sort((a, b) => a.ts - b.ts);
 }
 
+/** 분수·소수 트랙 안의 순서(1~37). 기초 연산 B1~B10 은 0 → 랭킹·학생 비교에서 빠진다 */
 const levelWeight = lv => Levels.LEVEL_ORDER.indexOf(lv) + 1;
 function compareEntries(a, b) {
   let d = b.score - a.score;                        if (d) return d;
@@ -621,6 +632,7 @@ async function getComparison(code, date1Key, date2Key) {
   rows.forEach(r => {
     const sc = scoreOf(r);
     if (sc === null) return;
+    if (levelWeight(r.level) <= 0) return;   // 기초 연산(B1~B10)은 비교·랭킹에 넣지 않는다 — 분수·소수 트랙만
     const dk = r.dateKey || dateKey(new Date(r.ts));
     if (dk !== date1Key && dk !== date2Key) return;
     const no = String(r.studentNo);
@@ -722,7 +734,7 @@ function fmtTime(ts) {
 return {
   init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate, rejectedCount,
   auth,
-  listClasses, createClass, renameClass, archiveClass, getClass, setOffDays,
+  listClasses, createClass, renameClass, archiveClass, getClass, setOffDays, setBasicStart,
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,

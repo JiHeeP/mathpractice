@@ -97,7 +97,7 @@ function createClass() {
 
 /* ═══ 반 화면 ═══ */
 function openClass(c) {
-  currentClass = Object.assign({ offDays: [] }, c);
+  currentClass = Object.assign({ offDays: [], basicStart: {} }, c);
   compareAuto = true;
   $('compareDate1').value = ''; $('compareDate2').value = '';
   App.only('teacherClass');
@@ -126,7 +126,7 @@ function switchTab(tab) {
     $(`tpanel-${t}`).classList.toggle('hidden', t !== tab);
     $(`ttab-${t}`).classList.toggle('ttab-on', t === tab);
   });
-  if (tab === 'settings') { loadStudents(); renderOffDays(); }
+  if (tab === 'settings') { loadStudents(); renderOffDays(); renderBasicStart(); }
   if (tab === 'ranking') loadRanking();
   if (tab === 'comparison') { initCompareDates(); loadComparison(); }
 }
@@ -277,6 +277,26 @@ function updateCompareHeaders() {
   hint.innerHTML = parts.join('');
 }
 
+/* ── 기초 연산 시작점 (반 설정, Firestore classes/{code}.basicStart — 형식은 levels.js parseBasicStart) ── */
+function renderBasicStart() {
+  const map = (currentClass && currentClass.basicStart) || {};
+  const n = Object.keys(map).length;
+  $('basicStartCount').textContent = n ? `· ${n}명` : '';
+  if (document.activeElement !== $('basicStartText')) $('basicStartText').value = Levels.formatBasicStart(map);
+}
+function saveBasicStart() {
+  const msg = $('basicStartMessage');
+  const { map, errors } = Levels.parseBasicStart($('basicStartText').value);
+  if (errors.length) { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = errors[0] + (errors.length > 1 ? ` 외 ${errors.length - 1}건` : ''); return; }
+  msg.className = 'text-sm font-bold text-gray-500'; msg.textContent = '저장 중...';
+  DB.setBasicStart(currentClass.code, map).then(m => {
+    currentClass.basicStart = m;
+    msg.className = 'text-sm font-bold text-emerald-600'; msg.textContent = `저장했습니다 (${Object.keys(m).length}명)`;
+    setTimeout(() => msg.textContent = '', 3000);
+    renderBasicStart();
+  }).catch(e => { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = '저장 실패: ' + (e.message || ''); });
+}
+
 /* ── 등교 안 하는 날 (반 설정, Firestore classes/{code}.offDays) ── */
 function renderOffDays() {
   const list = offDays();
@@ -375,6 +395,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, printCards
 };
 })();
