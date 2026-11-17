@@ -326,7 +326,12 @@ async function loadAllResults(code) {
  * 기록은 먼저 이 기기(localStorage)에 넣고, 서버에 올라간 것이 확인되면 지운다.
  * 와이파이가 끊기거나 탭이 닫혀도 기록이 사라지지 않고, 다음에 앱을 열 때 자동으로 다시 올린다.
  * 문서 ID를 기기에서 미리 정해 두므로 같은 기록을 두 번 올려도 한 번만 남는다
- * (보안 규칙이 기존 문서 수정을 막기 때문에 두 번째 쓰기는 거부되고, 그러면 '이미 올라감'으로 본다).
+ * (보안 규칙이 기존 문서 수정을 막기 때문에 두 번째 쓰기는 거부된다).
+ * 거부되면 서버에 그 문서가 정말 있는지 한 번 읽어 본다.
+ *   있으면 → 예전 전송이 사실은 성공한 것 → 보관함에서 지운다.
+ *   없으면 → 보안 규칙이 기록을 받아 주지 않은 것 → 지우지 않고 rejected 표시를 붙여 남겨 두고 경고한다.
+ *            (예전에는 이때도 지워 버려서 학생 기록이 조용히 사라질 수 있었다)
+ *            rejected 기록은 앱을 새로 열 때만 다시 보내 본다 (규칙을 고친 뒤 자동으로 올라가도록).
  */
 const OUTBOX_KEY = 'outbox';
 const outbox = {
@@ -341,30 +346,46 @@ function newResultId(code) {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-/** 보관함의 기록 하나를 서버에 올린다. 올라갔거나 이미 있으면 보관함에서 지운다. */
+/** 보관함의 기록 하나를 서버에 올린다.
+ *  돌려주는 값: true = 서버에 있음(보관함에서 지움) · false = 못 보냄(다음에 다시) · 'rejected' = 서버가 거부함(남겨 둠) */
 function sendOne(item) {
   if (sending[item.id]) return sending[item.id];
-  const p = resultsCol(item.code).doc(item.id).set(item.row)
+  const ref = resultsCol(item.code).doc(item.id);
+  const p = ref.set(item.row)
     .then(() => { outbox.drop(item.id); return true; })
     .catch(e => {
       const c = (e && e.code) || '';
-      // permission-denied = 같은 ID 문서가 이미 있음(이전 전송이 사실은 성공) 또는 규칙 위반 → 다시 보내도 소용없다
-      if (c.includes('permission-denied') || c.includes('already-exists')) { outbox.drop(item.id); return true; }
-      console.warn('기록 전송 실패 — 보관함에 남겨 두고 다음에 다시 보냅니다', e);
-      return false;
+      if (!(c.includes('permission-denied') || c.includes('already-exists'))) {
+        console.warn('기록 전송 실패 — 보관함에 남겨 두고 다음에 다시 보냅니다', e);
+        return false;
+      }
+      // 거부됨 — 같은 ID 문서가 이미 있어서인지(예전 전송 성공), 규칙이 막아서인지 서버에서 확인한다
+      return ref.get().then(snap => {
+        if (snap.exists) { outbox.drop(item.id); return true; }
+        outbox.put(Object.assign({}, item, { rejected: true }));
+        console.error('⚠️ 서버가 기록을 거부했습니다 — 지우지 않고 이 기기 보관함에 남겨 둡니다', item.id, e);
+        return 'rejected';
+      }, e2 => {
+        console.warn('거부 원인 확인 실패 — 보관함에 남겨 두고 다음에 다시 보냅니다', e2);
+        return false;
+      });
     })
     .finally(() => { delete sending[item.id]; });
   sending[item.id] = p;
   return p;
 }
 
-/** 보관함에 남은 기록을 모두 다시 보낸다 (앱 시작 · 인터넷 복구 · 저장 직후) */
-function flushOutbox() {
+/** 보관함에 남은 기록을 다시 보낸다 (앱 시작 · 인터넷 복구 · 저장 직후)
+ *  서버가 거부했던 기록(rejected)은 includeRejected 일 때(앱 시작)만 다시 보내 본다 — 저장할 때마다 헛되이 읽지 않도록 */
+function flushOutbox(includeRejected) {
   if (isLocal()) return Promise.resolve(0);
-  const items = outbox.list();
+  const items = outbox.list().filter(it => includeRejected || !it.rejected);
   if (!items.length) return Promise.resolve(0);
-  return Promise.all(items.map(sendOne)).then(r => r.filter(Boolean).length);
+  return Promise.all(items.map(sendOne)).then(r => r.filter(v => v === true).length);
 }
+
+/** 서버가 거부해서 이 기기에만 남아 있는 기록 수 */
+function rejectedCount() { return isLocal() ? 0 : outbox.list().filter(it => it.rejected).length; }
 
 /** 기록 한 줄을 영구 저장한다 — 로컬 모드는 바로, Firestore 는 보관함 → 서버 */
 function persistRow(code, id, row) {
@@ -408,6 +429,10 @@ async function saveResult(code, payload, opts) {
     return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
   if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
+  if (sent === 'rejected') {
+    return { displayScore: outcome.displayScore, scoreRecorded: false, isError: true,
+             message: '⚠️ 기록이 서버에 저장되지 않았어요. 이 기기에 남겨 두었으니 선생님께 알려 주세요.' };
+  }
   if (sent !== true) {
     return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
              message: '인터넷이 불안정해서 이 기기에 먼저 저장했어요. 연결되면 자동으로 올라가요.' };
@@ -439,7 +464,10 @@ function recoverDraft() {
 
 /** 앱 시작 시 한 번 — 풀던 중 기록 복구 + 못 보낸 기록 재전송, 인터넷이 돌아오면 다시 시도 */
 function startBackgroundSync() {
-  recoverDraft().then(() => flushOutbox());
+  recoverDraft().then(() => flushOutbox(true)).then(() => {
+    const n = rejectedCount();
+    if (n) console.error(`⚠️ 서버가 거부한 기록 ${n}건이 이 기기에 남아 있습니다`);
+  });
   if (!isLocal()) window.addEventListener('online', () => flushOutbox());
 }
 
@@ -691,7 +719,7 @@ function fmtTime(ts) {
 }
 
 return {
-  init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate,
+  init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate, rejectedCount,
   auth,
   listClasses, createClass, renameClass, archiveClass, getClass, setOffDays,
   getStudents, upsertStudent, deleteStudent, bulkImport,
