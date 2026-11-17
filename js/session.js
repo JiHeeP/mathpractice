@@ -8,13 +8,14 @@ const S = {
   seq: '',            // 이번 도전에서 푼 문제의 정오 ('1101…') — 통과 판정(최근 문제 창)에 쓴다
   recent: [],         // 이 레벨에서 가장 최근에 푼 문제들의 정오 (이전 도전 포함)
   wasPassed: false,   // 시작할 때 이미 통과한 레벨인가
-  justPassed: false   // 이번 도전 중에 통과했는가
+  justPassed: false,  // 이번 도전 중에 통과했는가
+  passedEarly: false  // 통과 기준을 채워 20문제 전에 판을 끝냈는가 (점수 없이 통과만 기록)
 };
 
 function start(level, mode, cfg, engine, onExit) {
   S.level = level; S.mode = mode; S.cfg = cfg; S.engine = engine; S.onExit = onExit;
   S.solved = 0; S.correct = 0; S.incorrect = 0; S.overtime = false; S.saved = false;
-  S.seq = ''; S.justPassed = false;
+  S.seq = ''; S.justPassed = false; S.passedEarly = false;
   S.recent = mode === 'challenge' ? App.recentOf(level).slice() : [];
   S.wasPassed = App.isPassed(level);
   guardNavigation();
@@ -113,7 +114,9 @@ function penalize(sec) {
   }
 }
 
-/** 문제 1개 끝. 도전 모드에서 목표 문제 수를 채웠으면 true */
+/** 문제 1개 끝. 도전 모드에서 목표 문제 수를 채웠거나, 아직 통과 못 한 레벨의 통과 기준을 채웠으면 true.
+ *  통과 기준은 앞 판까지 이어지는 최근 문제 창(levels.js computeProgress 와 같은 계산) — 18/20(과정형 9/10).
+ *  이미 통과한 레벨은 끝까지 풀어야 점수(랭킹)가 매겨지므로 일찍 끝내지 않는다. */
 function problemDone(ok) {
   S.solved++;
   if (ok) S.correct++; else S.incorrect++;
@@ -127,7 +130,9 @@ function problemDone(ok) {
   }
   if (isSkipTest()) S.seq += ok ? '1' : '0';
   updateSolved();
-  const done = (isChallenge() && S.solved >= S.total) || (isSkipTest() && (!ok || S.solved >= S.total));
+  if (isChallenge() && S.justPassed && !S.wasPassed && S.solved < S.total) S.passedEarly = true;
+  const done = (isChallenge() && (S.solved >= S.total || S.passedEarly))
+            || (isSkipTest() && (!ok || S.solved >= S.total));
   // 풀던 중 탭이 닫히거나 새로고침돼도 여기까지 푼 기록이 남도록 기기에 적어 둔다 (끝나면 saveResult/exit 가 지운다)
   if (!done && !S.saved) DB.saveDraft(App.classCode, buildPayload());
   return done;
@@ -139,7 +144,8 @@ function finishHTML() {
   const dur = elapsed();
   const over = S.overtime || dur > S.timeLimit;
   const next = App.levelAfter(S.level);
-  const head = S.justPassed ? '<div class="res-big text-green-600">통과! 🎉</div>'
+  const head = S.passedEarly ? '<div class="res-big text-green-600">통과! 🎉</div><div class="mb-3 text-sm font-bold text-green-700">최근 문제를 거의 다 맞혀서 바로 통과했어요</div>'
+             : S.justPassed ? '<div class="res-big text-green-600">통과! 🎉</div>'
              : S.wasPassed ? '<div class="res-big text-indigo-600">잘했어요!</div>'
              : '<div class="res-big text-indigo-600">다 풀었어요!</div>';
   const openLv = S.cfg && S.cfg.open;   // 기초 트랙은 원래 열려 있으므로 '열렸어요' 대신 다음 레벨만 알려 준다
@@ -154,7 +160,9 @@ function finishHTML() {
     <div class="res-row"><span class="text-green-600">⭕ ${S.correct}</span><span class="text-red-500">❌ ${S.incorrect}</span><span class="${over ? 'text-orange-600' : 'text-indigo-600'}">⏱ ${mmss(dur)}</span></div>
     ${over ? '<div class="mb-3 text-sm font-bold text-orange-600">시간이 지났어요</div>' : ''}
     ${passNote}
-    <div class="mb-4 text-sm text-gray-500">점수 <b id="sessScore" class="text-amber-700">계산 중...</b> · <span id="sessScoreNote">저장 중...</span></div>
+    ${S.passedEarly
+      ? '<div class="mb-4 text-sm text-gray-500"><span id="sessScoreNote">저장 중...</span><span id="sessScore" class="hidden"></span></div>'
+      : '<div class="mb-4 text-sm text-gray-500">점수 <b id="sessScore" class="text-amber-700">계산 중...</b> · <span id="sessScoreNote">저장 중...</span></div>'}
     <div class="flex flex-col gap-3">${buttons}
       <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
   </div>`;
@@ -199,7 +207,10 @@ function buildPayload() {
     durationSec: dur,
     timeLimit: S.timeLimit,
     isOvertime: over,
+    // 일찍 통과한 판은 mode 'aborted'(점수 없음, seq 는 통과 판정에 들어감)로 두고 resultStatus 로만 구분한다.
+    // mode 를 새로 만들지 않는 까닭: 예전 화면이 남은 기기·levels.js 의 통과 계산·서버 규칙을 그대로 쓰기 위해.
     resultStatus: !isChallenge() ? 'practice'
+                : S.passedEarly ? 'passed_early'
                 : S.solved < S.total ? 'aborted'
                 : (over ? 'failed_overtime' : 'success')
   });
@@ -219,6 +230,8 @@ function showScore(r) {
   if (!v || !n) return;
   v.textContent = r && r.displayScore != null ? `${r.displayScore}점` : '기록 없음';
   n.textContent = r ? (r.message || '') : '저장 실패';
+  // 일찍 통과한 판: 저장이 정상이면 '통과 기록됨'. 점수는 20문제를 다 푼 판에만 매겨진다
+  if (S.passedEarly && r && !r.isError && !r.pending) n.textContent = '통과가 기록되었어요. 점수는 끝까지 푼 판에만 매겨져요.';
   n.className = r && r.isError ? 'font-bold text-red-500'
               : r && r.pending ? 'font-bold text-amber-600'
               : r && r.scoreRecorded ? 'font-bold text-green-600'
