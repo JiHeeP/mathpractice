@@ -157,26 +157,78 @@ const LEVEL_CONFIGS = {
 };
 
 /* ═══ 잠금 ═══
- * 다음 레벨의 '도전 연습'을 열려면 이전 레벨에서 오답을 허용 개수 이하로 하고
- * 시간 감점 없이(제한시간의 80% 이내) 완주해야 한다.
- *   허용 오답: 문제가 10개 이하인 과정형 레벨은 1개, 나머지는 2개
- * 자유 연습은 언제나 열려 있다.
+ * 다음 레벨의 '도전 연습'은 이전 레벨을 '통과'해야 열린다.
+ *
+ * 통과 = 그 레벨 도전에서 가장 최근에 푼 문제들 중 정해진 개수 이상을 맞힘
+ *   4지선다 레벨(문제 15~20개): 최근 20문제 중 18개
+ *   과정형 레벨(문제 8~10개):   최근 10문제 중 9개
+ * 도중에 '그만하기'로 나가도 그때까지 푼 문제는 그대로 남는다.
+ * 그래서 한 문제 틀렸다고 그만두고 새로 시작해도 틀린 문제가 사라지지 않는다.
+ * (예전 규칙: 한 판을 오답 2개 이하로 완주. 틀리면 그만두고 다시 시작하는 일이 기록의 70%를 차지했다)
+ *
+ * 한 번 통과한 레벨은 계속 통과로 남는다. 시간은 통과 여부에 넣지 않는다(점수에는 그대로 반영).
+ * 자유 연습은 언제나 열려 있고 통과 계산에 들어가지 않는다.
  */
 function allowedWrong(level) { return (LEVEL_CONFIGS[level].chalQ <= 10) ? 1 : 2; }
 
+/** 통과 판정에 쓰는 '최근 문제' 창 — { size: 보는 문제 수, need: 맞혀야 하는 개수 } */
+function passWindow(level) {
+  const size = (LEVEL_CONFIGS[level].chalQ <= 10) ? 10 : 20;
+  return { size, need: size - allowedWrong(level) };
+}
+function windowCorrect(recent) { return (recent || []).reduce((n, v) => n + (v ? 1 : 0), 0); }
+function windowPassed(level, recent) { return windowCorrect(recent) >= passWindow(level).need; }
+
+/** 예전 규칙의 통과 점수 — 문제별 정오(seq)가 없는 예전 기록에만 쓴다 */
 function unlockThreshold(level) { return LEVEL_MAX[level] - allowedWrong(level) * 2; }
 
-function isLevelUnlocked(level, bestScores) {
+const SEQ_RE = /^[01]{1,400}$/;
+
+/** 한 학생의 기록 → { passed: {레벨: true}, recent: {레벨: [1,0,1,...]} }
+ *  - seq(문제별 정오, '1101…')가 있는 도전·중도 포기 기록: 시간 순서대로 이어 붙여 최근 창으로 판정
+ *  - seq 가 없는 예전 기록: 예전 규칙(완주한 판의 점수가 통과 점수 이상)으로 판정 → 이미 통과한 레벨은 그대로 인정
+ *  scoreOf(r) 는 점수로 인정되는 기록이면 점수를, 아니면 null 을 돌려주는 함수(db.js)
+ */
+function computeProgress(rows, scoreOf) {
+  const passed = {}, recent = {}, seen = {};
+  (rows || []).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0)).forEach(r => {
+    const lv = r && r.level;
+    if (!LEVEL_CONFIGS[lv]) return;
+    if (r.mode !== 'challenge' && r.mode !== 'aborted') return;
+    seen[lv] = true;
+    if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
+      const size = passWindow(lv).size;
+      const h = recent[lv] = recent[lv] || [];
+      for (let i = 0; i < r.seq.length; i++) {
+        h.push(r.seq[i] === '1' ? 1 : 0);
+        if (h.length > size) h.shift();
+        if (!passed[lv] && windowPassed(lv, h)) passed[lv] = true;
+      }
+    } else if (r.seq === undefined || r.seq === null) {
+      const s = scoreOf ? scoreOf(r) : null;
+      if (s !== null && s >= unlockThreshold(lv)) passed[lv] = true;
+    }
+  });
+  // 나중에 끼워 넣은 레벨: 그 뒤 레벨을 이미 통과한 학생은 통과로 인정 (아래 applyBackfillPass 와 같은 취지)
+  BACKFILLED_LEVELS.forEach(lv => {
+    if (passed[lv]) return;
+    const idx = LEVEL_ORDER.indexOf(lv);
+    if (Object.keys(passed).some(l => LEVEL_ORDER.indexOf(l) > idx)) passed[lv] = true;
+  });
+  return { passed, recent };
+}
+
+function isLevelUnlocked(level, passed) {
   const idx = LEVEL_ORDER.indexOf(level);
   if (idx <= 0) return true;                       // L1은 항상 열림
-  const prev = LEVEL_ORDER[idx - 1];
-  return (bestScores[prev] || 0) >= unlockThreshold(prev);
+  return !!(passed && passed[LEVEL_ORDER[idx - 1]]);
 }
-function getPrevLevelInfo(level, bestScores) {
+function getPrevLevelInfo(level, progress) {
   const idx = LEVEL_ORDER.indexOf(level);
   if (idx <= 0) return null;
   const prev = LEVEL_ORDER[idx - 1];
-  return { level: prev, max: LEVEL_MAX[prev], need: unlockThreshold(prev), best: bestScores[prev] || 0 };
+  const w = passWindow(prev);
+  return { level: prev, size: w.size, need: w.need, correct: windowCorrect(progress && progress.recent && progress.recent[prev]) };
 }
 
 /* ═══ 나중에 끼워 넣은 레벨의 '통과 인정' ═══
@@ -184,6 +236,7 @@ function getPrevLevelInfo(level, bestScores) {
  * L9-2 를 풀 기회가 없었는데도 L10 도전이 잠겨 버린다.
  * 그래서 L9-2 를 통과하지 못했더라도 그 뒤 레벨 점수가 하나라도 있으면 L9-2 를 만점으로 인정한다.
  * (지금은 L9-2 를 통과해야 L10 도전이 열리므로 새로 시작하는 학생에게는 해당되지 않는다)
+ * 여기서는 랭킹 합계용 점수(best)를 채우고, 잠금 해제용 통과 여부는 computeProgress 가 같은 방식으로 채운다.
  */
 const BACKFILLED_LEVELS = ['L9-2'];
 
@@ -233,6 +286,7 @@ function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass
 };
