@@ -94,7 +94,8 @@ check('시작점 앞 레벨: B5 건너뜀, B6·B2 아님, 약수배수는 안 �
 check("'-' 줄은 전부 건너뜀 (6번 곱셈·나눗셈)", ['B1','B2','B3','B4','B5','B8'].every(lv => L.basicSkipped(r1.map['6'], lv)));
 check('다음 기초 레벨: B1 → (B1 통과) B2 → 다 통과하면 B9', L.nextBasicLevel(st, {}) === 'B1' && L.nextBasicLevel(st, { B1: true }) === 'B2'
   && L.nextBasicLevel(st, { B1: true, B2: true, B3: true, B4: true, B6: true, B7: true, B8: true }) === 'B9');
-check('시작점이 없으면 다음 기초 레벨도 없음', L.nextBasicLevel(null, {}) === null);
+check('시작점이 없으면 B1부터', L.nextBasicLevel(null, {}) === 'B1' && L.nextBasicLevel(null, { B1: true }) === 'B2');
+check('기초를 다 통과하면 없음', L.nextBasicLevel(st, Object.fromEntries(L.BASIC_ORDER.map(lv => [lv, true]))) === null);
 
 console.log(fails ? `\n${fails}개 실패` : '\n모두 통과');
 process.exit(fails ? 1 : 0);

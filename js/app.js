@@ -242,14 +242,12 @@ const myStart = () => state.basicStart[String(state.studentNo)] || null;
 const isSkippedByStart = lv => L.basicSkipped(myStart(), lv);
 const doneBasic = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
 const nextBasic = () => L.nextBasicLevel(myStart(), state.progress.passed);
-/** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐) */
+/** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐)
+ *  통과 못 한 기초 레벨이 있으면 묶음과 상관없이 무조건 첫째로 띄운다(선생님 결정 2026-11-17).
+ *  가 묶음은 B3 통과 전까지 분수를 둘째 줄에도 띄우지 않는다. */
 function todayLevels() {
   const b = nextBasic(), f = nextLevel(), p = myStart();
-  const g = p && p.g;
-  let list;
-  if (g === '가' && !doneBasic('B3')) list = [b];
-  else if (g === '가' || g === '나') list = [b, f];
-  else list = [f, b];
+  const list = (p && p.g === '가' && !doneBasic('B3')) ? [b] : [b, f];
   return list.filter(Boolean);
 }
 

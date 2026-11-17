@@ -415,9 +415,9 @@ function basicSkipped(start, lv) {
   const list = BASIC_LINES[line];
   return list.indexOf(st) > list.indexOf(lv);
 }
-/** 기초 트랙에서 다음에 할 레벨 — 시작점이 있을 때만. 뺄셈 → 곱셈 → 나눗셈 → 약수와 배수 순 */
+/** 기초 트랙에서 다음에 할(아직 통과 못 한) 레벨. 뺄셈 → 곱셈 → 나눗셈 → 약수와 배수 순.
+ *  시작점이 없으면 각 줄의 처음부터 본다. 다 통과했으면 null */
 function nextBasicLevel(start, passed) {
-  if (!start) return null;
   return BASIC_ORDER.find(lv => !(passed && passed[lv]) && !basicSkipped(start, lv)) || null;
 }
 function formatBasicStart(map) {

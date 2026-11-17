@@ -317,7 +317,7 @@ function loadBasic(force) {
         <td class="px-2 py-2 text-center font-bold border-l border-slate-200">${nPass}/${L.BASIC_ORDER.length}</td></tr>`;
     }).join('') || `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-gray-500">학생이 없습니다.</td></tr>`;
     const noStart = nos.filter(no => !starts[no]).length;
-    $('tBasicSummary').textContent = `기초 레벨을 하나라도 통과한 학생 ${anyPass}명` + (noStart ? ` · 시작점이 없는 번호 ${noStart}개(오늘 할 것에 기초가 안 나옴)` : '');
+    $('tBasicSummary').textContent = `기초 레벨을 하나라도 통과한 학생 ${anyPass}명` + (noStart ? ` · 시작점이 없는 번호 ${noStart}개(B1부터 차례로 나옴)` : '');
   }).catch(e => { tb.innerHTML = `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-red-500">불러오지 못했습니다: ${e.message || e}</td></tr>`; });
 }
 
