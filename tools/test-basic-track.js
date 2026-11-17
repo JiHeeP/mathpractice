@@ -25,6 +25,9 @@ check('레벨 이름 8자 이하 (보안 규칙)', L.ALL_LEVELS.every(lv => lv.l
 check('모든 만점 ≤ 300 (보안 규칙)', L.ALL_LEVELS.every(lv => L.LEVEL_MAX[lv] <= 300));
 check('기존 레벨 문제 수 그대로 (L1 20 · L11 10 · L15 8)', L.LEVEL_CONFIGS.L1.chalQ === 20 && L.LEVEL_CONFIGS.L11.chalQ === 10 && L.LEVEL_CONFIGS.L15.chalQ === 8);
 
+check('계산 연습장 20레벨, 모두 4지선다·숫자 입력', L.SCRATCH_LEVELS.length === 20 && L.SCRATCH_LEVELS.every(lv => L.LEVEL_CONFIGS[lv].scratch && L.LEVEL_CONFIGS[lv].engine !== 'frac'));
+check('B5·L1·L11 에는 연습장 없음', !L.LEVEL_CONFIGS.B5.scratch && !L.LEVEL_CONFIGS.L1.scratch && !L.LEVEL_CONFIGS.L11.scratch);
+
 console.log('잠금');
 let same = true;
 L.LEVEL_ORDER.forEach((lv, i) => {

@@ -237,6 +237,13 @@ const LEVEL_CONFIGS = {
 };
 Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS);
 
+/** 계산 연습장(js/scratch.js)을 붙이는 레벨 — 중간 계산을 종이에 적어야 하는데 화면이 대신 보여 주지 않는 레벨.
+ *  선생님 승인 2026-11-17: '필요' 20개. 단계 풀이(과정형)는 풀이판이 중간값을 채워 주므로 넣지 않았다.
+ *  B5(구구 나눗셈)·그림·자리 옮기기·동분모처럼 암산으로 되는 레벨도 뺐다. */
+const SCRATCH_LEVELS = ['B1', 'B2', 'B3', 'B4', 'B6', 'B7', 'B8', 'B9', 'B10',
+                        'L9', 'L10', 'L12', 'L14', 'L16', 'L18', 'L21', 'L22', 'L27', 'L32', 'L36'];
+SCRATCH_LEVELS.forEach(lv => { LEVEL_CONFIGS[lv].scratch = true; });
+
 /* ═══ 잠금 ═══
  * 다음 레벨의 '도전 연습'은 이전 레벨을 '통과'해야 열린다.
  *
@@ -406,7 +413,7 @@ function formatBasicStart(map) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS,
+  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
   trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
