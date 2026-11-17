@@ -227,7 +227,8 @@ function levelAfter(lv) {
 }
 
 /** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
- *  잠긴 레벨도 누를 수 있다(연습은 언제나 열려 있음). 잠금 계산은 levels.js 그대로. */
+ *  잠긴 레벨도 누르면 카드에서 무엇을 먼저 통과해야 하는지 보여 준다. 잠금 계산은 levels.js 그대로.
+ *  (자유 연습 버튼은 2026-11-17 선생님 결정으로 뺐다 — 학생 화면은 '도전' 하나. 예전 free 기록은 그대로 남고 읽힌다) */
 function renderLevelButtons() {
   const container = $('levelList');
   container.innerHTML = '';
@@ -298,7 +299,7 @@ function renderLevelButtons() {
   }
 }
 
-/** 레벨 카드 — 이름 · 짧은 설명 · 푼 예시 하나 · 최근 문제 점 · 도전/연습 버튼 */
+/** 레벨 카드 — 이름 · 짧은 설명 · 푼 예시 하나 · 최근 문제 점 · 도전 버튼 */
 function selectLevel(lv) {
   state.level = lv;
   const cfg = L.LEVEL_CONFIGS[lv];
