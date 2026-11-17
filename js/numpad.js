@@ -1,4 +1,5 @@
-/* numpad.js — 화면 숫자판 (과정형 단계 풀이에서 씀)
+/* numpad.js — 화면 숫자판
+ * 기초 연산(numinput.js)과 과정형(step-frac.js)이 함께 쓴다.
  * 기기 자판을 띄우지 않고 화면 숫자판으로 칸을 채운다. 태블릿에서 기기 자판이 풀이판·확인 버튼을 덮던 문제를 없앤다.
  *   [1][2][3][4][5][⌫][다음 칸 ▶]
  *   [6][7][8][9][0][  ][  확인   ]   ← ⌫ 와 다음 칸/확인 키는 두 줄 높이
@@ -8,8 +9,11 @@
 const NumPad = (() => {
   const KEYS = ['1', '2', '3', '4', '5', 'del', 'go', '6', '7', '8', '9', '0'];
 
-  function html() {
-    return `<div class="np">${KEYS.map(k =>
+  /** opts.extra = ',' 처럼 숫자 말고 한 개 더 필요한 키(두 줄 높이로 지우기 앞에 붙는다) */
+  function html(opts = {}) {
+    const keys = opts.extra ? KEYS.slice(0, 5).concat('extra', KEYS.slice(5)) : KEYS;
+    return `<div class="np${opts.extra ? ' np-x' : ''}">${keys.map(k =>
+      k === 'extra' ? `<button type="button" class="np-key np-extra" data-k="${opts.extra}">${opts.extraLabel || opts.extra}</button>` :
       k === 'del' ? '<button type="button" class="np-key np-del" data-k="del" aria-label="지우기">⌫</button>'
       : k === 'go' ? '<button type="button" class="np-key np-go" data-k="go" id="npGo">다음 칸 ▶</button>'
       : `<button type="button" class="np-key" data-k="${k}">${k}</button>`).join('')}</div>`;

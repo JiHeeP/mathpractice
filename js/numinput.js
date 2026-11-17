@@ -1,7 +1,7 @@
 /* numinput.js — 숫자 직접 입력 엔진 (기초 연산 B1~B10)
  * 문제는 generator.js 의 generateNumProblem 이 만든 { display, fields:[{label, ans, list?}] }.
- * 화면 숫자판(0~9 · 지우기 · 쉼표)으로 칸을 채운다. 키보드로 쳐도 된다.
- *   - 칸이 여러 개면(몫·나머지) 칸을 눌러 옮기거나, 칸이 차면 '다음 칸'으로 넘어간다
+ * 화면 숫자판(js/numpad.js — 0~9 · 지우기 · 쉼표 · 다음 칸/확인)으로 칸을 채운다. 키보드로 쳐도 된다.
+ *   - 칸이 여러 개면(몫·나머지) 칸을 눌러 옮기거나 '다음 칸 ▶'(키보드 Enter)으로 넘어간다. 마지막 칸에서는 '확인'
  *   - list 칸(약수·배수)은 쉼표로 구분해 여러 수를 쓴다. 순서는 상관없다
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
  */
@@ -37,14 +37,15 @@ function next() {
     </div>
     ${hasList ? '<div class="text-center text-xs font-bold text-gray-400 mt-1">수와 수 사이에 쉼표( , )를 넣어요</div>' : ''}
     <div id="numFb" class="min-h-8 mt-2 text-center font-bold text-lg"></div>
-    <div class="num-pad">${['1','2','3','4','5','6','7','8','9', hasList ? ',' : '', '0', '⌫'].map(k =>
-      k ? `<button class="num-key${k === '⌫' ? ' num-del' : ''}" data-k="${k}">${k}</button>` : '<span></span>').join('')}
-      <button class="num-key num-ok" data-k="ok">확인</button>
-    </div>`;
+    ${NumPad.html(hasList ? { extra: ',', extraLabel: '쉼표<br><b class="text-2xl">,</b>' } : {})}
+`;
   document.querySelectorAll('.num-field').forEach(b => b.onclick = () => { if (!waiting) { cur = +b.dataset.i; paint(); } });
-  document.querySelectorAll('.num-key').forEach(b => b.onclick = () => press(b.dataset.k));
+  NumPad.bind(document.getElementById('numBody'), press);
   paint();
 }
+
+/** 지금 칸 말고 빈칸이 남았으면 '다음 칸 ▶', 아니면 '확인' */
+const isLast = () => !vals.some((v, i) => i !== cur && v.trim() === '');
 
 function paint() {
   prob.fields.forEach((f, i) => {
@@ -53,13 +54,19 @@ function paint() {
     const box = el && el.parentElement;
     if (box) box.classList.toggle('on', i === cur && !waiting);
   });
+  NumPad.setGo(isLast());
 }
 
 function press(k) {
   if (waiting) return;
   const f = prob.fields[cur];
-  if (k === 'ok') return submit();
-  if (k === '⌫') vals[cur] = /, $/.test(vals[cur]) ? vals[cur].slice(0, -2) : vals[cur].slice(0, -1);
+  if (k === 'go' || k === 'ok') {
+    if (isLast()) return submit();
+    const empty = vals.findIndex((v, i) => i > cur && v.trim() === '');
+    cur = empty !== -1 ? empty : vals.findIndex(v => v.trim() === '');
+    return paint();
+  }
+  if (k === 'del' || k === '⌫') vals[cur] = /, $/.test(vals[cur]) ? vals[cur].slice(0, -2) : vals[cur].slice(0, -1);
   else if (k === ',') { if (f.list && vals[cur] && !/, $/.test(vals[cur])) vals[cur] += ', '; }
   else if (/^\d$/.test(k)) {
     const tail = vals[cur].split(',').pop().trim();
@@ -107,7 +114,7 @@ document.addEventListener('keydown', e => {
   if (/^\d$/.test(e.key)) press(e.key);
   else if (e.key === ',' ) press(',');
   else if (e.key === 'Backspace') { e.preventDefault(); press('⌫'); }
-  else if (e.key === 'Enter') press('ok');
+  else if (e.key === 'Enter') { e.preventDefault(); press('go'); }
   else if (e.key === 'Tab' && prob.fields.length > 1 && !waiting) { e.preventDefault(); cur = (cur + 1) % prob.fields.length; paint(); }
 });
 
