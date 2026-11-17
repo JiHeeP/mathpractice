@@ -41,7 +41,8 @@ const payload = { studentNo: '99', level: 'L1', mode: 'aborted', resultStatus: '
     Levels.LEVEL_ORDER.filter(lv => lv !== 'L9-2').forEach((lv, i) => { old[lv] = 90 + i * 5; });
     old['L9-2'] = 133;
     check('37레벨 모두 같은 값', Levels.LEVEL_ORDER.every(lv => Levels.LEVEL_MAX[lv] === old[lv]));
-    check('만점 목록과 레벨 목록의 레벨이 같음', Object.keys(Levels.LEVEL_MAX).length === Levels.LEVEL_ORDER.length);
+    check('만점 목록과 레벨 목록(두 트랙)의 레벨이 같음', Object.keys(Levels.LEVEL_MAX).length === Levels.ALL_LEVELS.length
+      && Levels.ALL_LEVELS.every(lv => Levels.LEVEL_MAX[lv] > 0));
     check('모든 만점 ≤ 300 (보안 규칙 상한)', Object.values(Levels.LEVEL_MAX).every(v => v <= 300));
   }
 

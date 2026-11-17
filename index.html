@@ -9,7 +9,7 @@
 </head>
 <body class="bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 min-h-full p-4 font-sans selection:bg-orange-200">
 
-<div class="max-w-2xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
+<div class="app-shell max-w-2xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
 <header id="appHeader" class="bg-gradient-to-r from-orange-400 to-red-400 text-white text-center py-6 px-4 shadow-md">
   <h1 id="gameTitle" class="text-3xl font-black tracking-tight drop-shadow-md">분수 연산 마스터</h1>
   <p id="classBadge" class="hidden mt-1 text-sm font-bold text-orange-100"></p>
@@ -139,8 +139,25 @@
 
   <div class="mb-4 flex flex-wrap gap-2">
     <button id="ttab-comparison" class="ttab ttab-on" onclick="Teacher.switchTab('comparison')">학생 비교</button>
+    <button id="ttab-basic" class="ttab" onclick="Teacher.switchTab('basic')">기초 연산</button>
     <button id="ttab-ranking" class="ttab" onclick="Teacher.switchTab('ranking')">랭킹</button>
     <button id="ttab-settings" class="ttab" onclick="Teacher.switchTab('settings')">설정</button>
+  </div>
+
+  <!-- 기초 연산 통과 현황 -->
+  <div id="tpanel-basic" class="hidden">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <p class="text-xs text-slate-500"><b class="text-emerald-700">✓</b> 통과 · <b class="text-slate-400">⤼</b> 시작점 앞(건너뜀) · <b>7/20</b> 최근 문제 중 정답 수 · <span class="bb-now px-1">테두리</span> 지금 할 레벨 · 빈칸 아직 안 풂.
+        시작점은 설정 탭에서 정합니다.</p>
+      <button class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition whitespace-nowrap" onclick="Teacher.loadBasic(true)">새로 고침</button>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-slate-300 bg-white">
+      <table class="bb-table w-full text-sm text-gray-700">
+        <thead id="tBasicHead"></thead>
+        <tbody id="tBasicBody"><tr><td class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="tBasicSummary" class="mt-2 text-xs text-slate-500"></div>
   </div>
 
   <!-- 랭킹 -->
@@ -245,6 +262,23 @@
     </section>
 
     <section>
+    <details id="basicStartBox" class="bg-slate-50 border border-slate-200 rounded-xl">
+      <summary class="px-3 py-2 text-sm font-bold text-slate-600 cursor-pointer select-none">🧮 기초 연산 시작점 <span id="basicStartCount" class="font-normal text-slate-400"></span></summary>
+      <div class="px-3 pb-3">
+        <p class="text-xs text-slate-500 mb-2">한 줄에 한 학생: <b>번호 뺄셈 곱셈 나눗셈 묶음</b> (예: <code>3 B1 B2 B6 가</code>). 그 줄을 이미 통과했으면 <code>-</code>.<br/>
+          뺄셈 B1 · 곱셈 B2~B4 · 나눗셈 B5~B8. 약수·배수(B9·B10)는 모두 거칩니다.<br/>
+          묶음 — <b>가</b>: B3 통과 전까지 기초만 · <b>나</b>: 기초 먼저 · <b>다·라</b>: 분수 먼저. 학생 화면 '오늘 할 것'에 반영됩니다. 이름은 쓰지 마세요.</p>
+        <textarea id="basicStartText" rows="8" placeholder="3 B1 B2 B6 가&#10;1 - B3 B6 나&#10;6 - - - 라"
+          class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"></textarea>
+        <div class="flex items-center gap-2 mt-2">
+          <button class="px-4 py-2 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 transition" onclick="Teacher.saveBasicStart()">저장</button>
+          <span id="basicStartMessage" class="text-sm font-bold"></span>
+        </div>
+      </div>
+    </details>
+    </section>
+
+    <section>
     <details class="border-2 border-red-200 bg-red-50 rounded-2xl">
       <summary class="px-4 py-3 font-black text-red-800 cursor-pointer select-none">⚠️ 기록 초기화 <span class="font-normal text-sm">(되돌릴 수 없음 · 눌러서 열기)</span></summary>
       <div class="px-4 pb-3">
@@ -276,7 +310,9 @@
 <script src="js/db.js"></script>
 <script src="js/session.js"></script>
 <script src="js/step-frac.js"></script>
+<script src="js/scratch.js"></script>
 <script src="js/quiz.js"></script>
+<script src="js/numinput.js"></script>
 <script src="js/teacher.js"></script>
 <script src="js/app.js"></script>
 </body>

@@ -6,6 +6,7 @@ const state = {
   classCode: null, className: '',
   studentNo: null, studentName: '',
   level: null, bestScores: {},
+  basicStart: {},   // 번호별 기초 트랙 시작점 — 교사 화면 설정에서 정한다(반 문서 basicStart). 없으면 시작점 없음
   progress: { passed: {}, recent: {} },   // 통과한 레벨 · 레벨별 최근 문제 정오 (규칙은 levels.js)
   loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
 };
@@ -82,6 +83,7 @@ function enterClass(code, studentParam, silentFail) {
     }
     state.classCode = cls.code;
     state.className = cls.name;
+    state.basicStart = cls.basicStart || {};
     remember.set(cls.code);
     const badge = $('classBadge');
     badge.textContent = `${cls.name} · 코드 ${cls.code}`;
@@ -216,14 +218,30 @@ function retryLoadLevels() {
   loadLevels();
 }
 
-/** 오늘 할 것 — 아직 통과하지 못한 레벨 중 도전이 열린 첫 레벨. 다 통과했으면 null */
+/** 분수·소수 트랙에서 할 것 — 아직 통과하지 못한 레벨 중 도전이 열린 첫 레벨. 다 통과했으면 null */
 function nextLevel() {
   return L.LEVEL_ORDER.find(lv => !state.progress.passed[lv] && L.isLevelUnlocked(lv, state.progress.passed)) || null;
 }
-/** 목록에서 바로 다음 레벨 (결과 화면의 '다음 레벨로' 버튼) */
-function levelAfter(lv) {
-  const i = L.LEVEL_ORDER.indexOf(lv);
-  return i >= 0 && i + 1 < L.LEVEL_ORDER.length ? L.LEVEL_ORDER[i + 1] : null;
+/** 같은 트랙(기초는 같은 줄)에서 바로 다음 레벨 (결과 화면의 '다음 레벨로' 버튼) */
+function levelAfter(lv) { return L.nextInTrack(lv); }
+
+/* ═══ 기초 트랙 시작점 ═══
+ * 반 문서의 basicStart = { '번호': { sub, mul, div, g } }  (값: 'B1'~'B8' 또는 '-' = 그 줄은 통과)
+ * 약수와 배수(B9·B10)는 모두가 거친다. 묶음 g: 가 = 기초만(B3 통과 전까지), 나 = 기초 먼저, 다·라 = 분수 먼저
+ */
+const myStart = () => state.basicStart[String(state.studentNo)] || null;
+const isSkippedByStart = lv => L.basicSkipped(myStart(), lv);
+const doneBasic = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
+const nextBasic = () => L.nextBasicLevel(myStart(), state.progress.passed);
+/** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐) */
+function todayLevels() {
+  const b = nextBasic(), f = nextLevel(), p = myStart();
+  const g = p && p.g;
+  let list;
+  if (g === '가' && !doneBasic('B3')) list = [b];
+  else if (g === '가' || g === '나') list = [b, f];
+  else list = [f, b];
+  return list.filter(Boolean);
 }
 
 /** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
@@ -242,7 +260,8 @@ function renderLevelButtons() {
     container.appendChild(warn);
   }
 
-  const next = nextLevel();
+  const today = todayLevels();
+  const next = today[0] || null, second = today[1] || null;
   const card = document.createElement('div');
   card.className = 'next-card';
   if (next) {
@@ -250,9 +269,11 @@ function renderLevelButtons() {
     card.innerHTML = `<span class="next-k">오늘 할 것</span>
       <button class="next-t" data-act="card"><b>${next}</b>${cfg.label}</button>
       ${Session.windowHTML(next, state.progress.recent[next] || [], false)}
-      <button class="big-btn big-go" data-act="go">🔥 도전 시작</button>`;
+      <button class="big-btn big-go" data-act="go">🔥 도전 시작</button>
+      ${second ? `<button class="next-sub" data-act="second">그다음 <b>${second}</b>${L.LEVEL_CONFIGS[second].label}</button>` : ''}`;
     card.querySelector('[data-act=card]').onclick = () => selectLevel(next);
     card.querySelector('[data-act=go]').onclick = () => { state.level = next; startPractice('challenge'); };
+    if (second) card.querySelector('[data-act=second]').onclick = () => selectLevel(second);
   } else {
     card.innerHTML = `<span class="next-k">오늘 할 것</span>
       <div class="next-t">모든 레벨을 통과했어요! 🎉</div>
@@ -260,43 +281,55 @@ function renderLevelButtons() {
   }
   container.appendChild(card);
 
-  // 묶음(그룹)별로 칩을 만든다
-  const groups = [];
-  L.LEVEL_ORDER.forEach(lv => {
-    const g = L.LEVEL_CONFIGS[lv].group;
-    if (!groups.length || groups[groups.length - 1].key !== g) groups.push({ key: g, levels: [] });
-    groups[groups.length - 1].levels.push(lv);
-  });
+  // 트랙별로, 그 안에서 묶음(그룹)별로 칩을 만든다
+  const groupsOf = levels => {
+    const groups = [];
+    levels.forEach(lv => {
+      const g = L.LEVEL_CONFIGS[lv].group;
+      if (!groups.length || groups[groups.length - 1].key !== g) groups.push({ key: g, levels: [] });
+      groups[groups.length - 1].levels.push(lv);
+    });
+    return groups;
+  };
+  const isDone = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
   const groupEl = g => {
-    const done = g.levels.filter(lv => state.progress.passed[lv]).length;
+    const done = g.levels.filter(isDone).length;
     const el = document.createElement('div');
     el.className = 'lv-grp';
     el.innerHTML = `<div class="lv-gh"><span>${L.GROUP_LABELS[g.key]}</span><span>${done}/${g.levels.length}</span></div><div class="lv-chips"></div>`;
     const chips = el.querySelector('.lv-chips');
     g.levels.forEach(lv => {
       const passed = !!state.progress.passed[lv];
+      const skipped = !passed && isSkippedByStart(lv);
       const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
       const b = document.createElement('button');
-      b.className = 'lv-chip ' + (lv === next ? 'now' : passed ? 'done' : unlocked ? '' : 'lock');
-      b.textContent = lv + (passed ? ' ✓' : unlocked ? '' : ' 🔒');
-      b.title = L.LEVEL_CONFIGS[lv].label;
+      b.className = 'lv-chip ' + (lv === next ? 'now' : passed ? 'done' : skipped ? 'skip' : unlocked ? '' : 'lock');
+      b.textContent = lv + (passed ? ' ✓' : skipped ? ' ⤼' : unlocked ? '' : ' 🔒');
+      b.title = L.LEVEL_CONFIGS[lv].label + (skipped ? ' (시작점 앞 — 건너뛰어도 돼요)' : '');
       b.onclick = () => selectLevel(lv);
       chips.appendChild(b);
     });
     return el;
   };
 
-  const finished = groups.filter(g => g.levels.every(lv => state.progress.passed[lv]));
-  const rest = groups.filter(g => !finished.includes(g));
-  rest.forEach(g => container.appendChild(groupEl(g)));
-  if (finished.length) {
-    const fold = document.createElement('details');
-    fold.className = 'lv-fold';
-    const first = finished[0].levels[0], lastG = finished[finished.length - 1];
-    fold.innerHTML = `<summary>끝낸 레벨 ${first}~${lastG.levels[lastG.levels.length - 1]} 보기</summary><div></div>`;
-    finished.forEach(g => fold.lastElementChild.appendChild(groupEl(g)));
-    container.appendChild(fold);
-  }
+  L.TRACK_KEYS.forEach(t => {
+    const tr = L.TRACKS[t];
+    const head = document.createElement('div');
+    head.className = 'lv-track';
+    head.textContent = tr.label + (tr.open ? ' · 언제든 풀 수 있어요' : '');
+    container.appendChild(head);
+    const groups = groupsOf(tr.levels);
+    const finished = groups.filter(g => g.levels.every(isDone));
+    groups.filter(g => !finished.includes(g)).forEach(g => container.appendChild(groupEl(g)));
+    if (finished.length) {
+      const fold = document.createElement('details');
+      fold.className = 'lv-fold';
+      const first = finished[0].levels[0], lastG = finished[finished.length - 1];
+      fold.innerHTML = `<summary>끝낸 레벨 ${first}~${lastG.levels[lastG.levels.length - 1]} 보기</summary><div></div>`;
+      finished.forEach(g => fold.lastElementChild.appendChild(groupEl(g)));
+      container.appendChild(fold);
+    }
+  });
 }
 
 /** 레벨 카드 — 이름 · 짧은 설명 · 푼 예시 하나 · 최근 문제 점 · 도전 버튼 */
@@ -329,6 +362,14 @@ function selectLevel(lv) {
 
 /** 4지선다 레벨은 문제 하나를 만들어 정답과 함께 보여 준다 (설명을 덜 읽어도 할 일이 보이게). 과정형은 생략 */
 function exampleHTML(lv, cfg) {
+  if (cfg.engine === 'num') {
+    try {
+      const q = Gen.generateNumProblem(lv);
+      const ans = q.fields.map(f => (f.label ? f.label + ' ' : '') + (f.list ? f.ans.join(', ') : f.ans)).join(' · ');
+      return `<div class="ex-box"><span class="ex-lbl">예시</span><div class="quiz-q num-q">${q.display}</div>
+        <div class="ex-ans">정답 ➜ ${ans}</div></div>`;
+    } catch (e) { return ''; }
+  }
   if (cfg.engine !== 'choice') return '';
   try {
     const q = Gen.generateChoiceSet(lv, 1)[0];
@@ -343,8 +384,9 @@ function startPractice(mode) {
   const cfg = L.LEVEL_CONFIGS[state.level];
   only('practiceArea');
   const back = after => backToLevels(after);
-  if (cfg.engine === 'choice') Quiz.init(state.level, mode, cfg, back);
-  else                         StepFrac.init(state.level, mode, cfg, back);
+  if (cfg.engine === 'choice')   Quiz.init(state.level, mode, cfg, back);
+  else if (cfg.engine === 'num') NumInput.init(state.level, mode, cfg, back);
+  else                           StepFrac.init(state.level, mode, cfg, back);
 }
 
 /** 연습이 끝나고 돌아올 때. after = 'again'(한 번 더) | 'next'(다음 레벨 카드) | 없음(목록) */

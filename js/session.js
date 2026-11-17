@@ -138,8 +138,9 @@ function finishHTML() {
              : S.justPassed ? '<div class="res-big text-green-600">통과! 🎉</div>'
              : S.wasPassed ? '<div class="res-big text-indigo-600">잘했어요!</div>'
              : '<div class="res-big text-indigo-600">다 풀었어요!</div>';
+  const openLv = S.cfg && S.cfg.open;   // 기초 트랙은 원래 열려 있으므로 '열렸어요' 대신 다음 레벨만 알려 준다
   const passNote = S.justPassed && next
-    ? `<div class="mb-3 rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-sm font-black text-green-700">${next} 도전이 열렸어요</div>` : '';
+    ? `<div class="mb-3 rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-sm font-black text-green-700">${openLv ? `다음은 ${next}` : `${next} 도전이 열렸어요`}</div>` : '';
   const buttons = S.justPassed && next
     ? `<button onclick="Session.exit('next')" class="big-btn big-go">${next}로 가기 👉</button>
        <button onclick="Session.exit('again')" class="big-btn big-alt">한 번 더</button>`
