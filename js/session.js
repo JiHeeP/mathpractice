@@ -26,18 +26,20 @@ function start(level, mode, cfg, engine, onExit) {
 const isChallenge = () => S.mode === 'challenge';
 const elapsed = () => Math.floor((Date.now() - S.startAt) / 1000);
 
-/** 화면 상단 헤더 (풀이 수 · 타이머 · 그만하기) */
+/** 화면 상단 — 진행 막대(몇 번째 문제) · 시간 막대 · 그만하기(✕). 글자 대신 막대로 보여 준다 */
 function headerHTML() {
-  const counter = isChallenge() ? `${S.solved} / ${S.total}` : `${S.solved}`;
-  const timer = isChallenge()
-    ? '<div id="sessTimer" class="font-mono text-lg font-bold text-gray-700">남은 시간: --</div>'
-    : '<div class="text-xs font-bold text-green-600 bg-green-50 border border-green-200 rounded-full px-3 py-1">🌱 자유 연습</div>';
-  return `<div class="flex justify-between items-center gap-2 mb-3">
-    <div class="text-sm text-gray-500 font-bold whitespace-nowrap">풀이 <span class="text-indigo-600 text-lg" id="sessSolved">${counter}</span></div>
-    ${timer}
-    <button class="px-3 py-2 bg-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-300 transition text-sm whitespace-nowrap" onclick="Session.exit()">그만하기</button>
-  </div>${isChallenge() ? `<div id="sessWindow" class="mb-3">${windowHTML(S.level, S.recent, S.wasPassed || S.justPassed)}</div>` : ''}`;
+  const x = '<button class="sx-x" onclick="Session.exit()" title="그만하기" aria-label="그만하기">✕</button>';
+  if (!isChallenge()) {
+    return `<div class="sx-top"><span class="sx-num" id="sessSolved">${S.solved}문제</span>
+      <span class="sx-free">🌱 연습 · 점수 없음</span><span class="flex-1"></span>${x}</div>`;
+  }
+  return `<div class="sx-top"><span class="sx-num" id="sessSolved">${S.solved} / ${S.total}</span>
+      <div class="sx-bar"><b id="sessProg" style="width:${pct(S.solved, S.total)}%"></b></div>${x}</div>
+    <div class="sx-clock" id="sessClock">⏱<div class="sx-bar"><b id="sessClockBar" style="width:100%"></b></div><span id="sessTimer">--</span></div>
+    <div id="sessWindow" class="mb-3">${windowHTML(S.level, S.recent, S.wasPassed || S.justPassed)}</div>`;
 }
+const pct = (a, b) => b ? Math.min(100, Math.round(a / b * 100)) : 0;
+const mmss = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
 /** '최근 문제' 막대 — 맞힌 문제는 초록, 틀린 문제는 빨강, 아직 안 푼 칸은 회색.
  *  그만두고 다시 시작해도 이 막대는 그대로 이어진다. */
@@ -63,7 +65,9 @@ function updateWindow() {
 
 function updateSolved() {
   const el = document.getElementById('sessSolved');
-  if (el) el.textContent = isChallenge() ? `${S.solved} / ${S.total}` : `${S.solved}`;
+  if (el) el.textContent = isChallenge() ? `${S.solved} / ${S.total}` : `${S.solved}문제`;
+  const bar = document.getElementById('sessProg');
+  if (bar) bar.style.width = pct(S.solved, S.total) + '%';
 }
 
 function startTimer() {
@@ -72,14 +76,17 @@ function startTimer() {
   const paint = () => {
     const el = document.getElementById('sessTimer');
     if (!el) return;
+    const clock = document.getElementById('sessClock'), bar = document.getElementById('sessClockBar');
     const left = S.timeLimit - elapsed();
     if (left >= 0) {
-      el.textContent = `남은 시간: ${left}초`;
-      el.classList.remove('text-red-600'); el.classList.add('text-gray-700');
+      el.textContent = mmss(left);
+      if (bar) bar.style.width = pct(left, S.timeLimit) + '%';
+      if (clock) clock.classList.remove('over');
     } else {
       S.overtime = true;
-      el.textContent = `초과: ${Math.abs(left)}초`;
-      el.classList.remove('text-gray-700'); el.classList.add('text-red-600');
+      el.textContent = '+' + mmss(-left);
+      if (bar) bar.style.width = '100%';
+      if (clock) clock.classList.add('over');
     }
   };
   paint();
@@ -91,10 +98,10 @@ function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } 
 function penalize(sec) {
   if (!isChallenge()) return;
   S.startAt -= sec * 1000;
-  const el = document.getElementById('sessTimer');
+  const el = document.getElementById('sessClock');
   if (el) {
-    el.classList.add('text-red-600');
-    setTimeout(() => { if (S.timeLimit - elapsed() >= 0) el.classList.remove('text-red-600'); }, 900);
+    el.classList.add('over');
+    setTimeout(() => { if (S.timeLimit - elapsed() >= 0) el.classList.remove('over'); }, 900);
   }
 }
 
@@ -117,27 +124,29 @@ function problemDone(ok) {
   return done;
 }
 
-/** 도전 완료 화면 HTML */
+/** 도전 완료 화면 — 통과했으면 '다음 레벨로'가 큰 버튼, 아니면 '한 번 더'가 큰 버튼 */
 function finishHTML() {
   stopTimer();
   const dur = elapsed();
   const over = S.overtime || dur > S.timeLimit;
-  const badge = over
-    ? '<div class="mb-3 inline-flex items-center rounded-full bg-orange-100 px-4 py-2 text-sm font-bold text-orange-700">시간 초과</div>'
-    : '<div class="mb-3 inline-flex items-center rounded-full bg-green-100 px-4 py-2 text-sm font-bold text-green-700">시간 내 완료!</div>';
+  const next = App.levelAfter(S.level);
+  const head = S.justPassed ? '<div class="res-big text-green-600">통과! 🎉</div>'
+             : S.wasPassed ? '<div class="res-big text-indigo-600">잘했어요!</div>'
+             : '<div class="res-big text-indigo-600">다 풀었어요!</div>';
+  const passNote = S.justPassed && next
+    ? `<div class="mb-3 rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-sm font-black text-green-700">${next} 도전이 열렸어요</div>` : '';
+  const buttons = S.justPassed && next
+    ? `<button onclick="Session.exit('next')" class="big-btn big-go">${next}로 가기 👉</button>
+       <button onclick="Session.exit('again')" class="big-btn big-alt">한 번 더</button>`
+    : `<button onclick="Session.exit('again')" class="big-btn big-go">🔥 한 번 더</button>`;
   return `<div class="bg-white p-6 rounded-2xl border border-gray-200 text-center">
-    <h2 class="text-2xl font-black text-blue-600 mb-2">도전 완료!</h2>
-    <p class="text-gray-500 mb-4">${App.studentName} 학생, 수고했어요!</p>
-    ${badge}
-    ${S.justPassed ? '<div class="mb-3 rounded-xl bg-green-50 border border-green-200 px-4 py-2 text-sm font-black text-green-700">🎉 통과! 다음 레벨 도전이 열렸어요</div>' : ''}
-    <div class="space-y-2 mb-4 text-left max-w-xs mx-auto">
-      <div class="flex justify-between p-2 bg-green-50 rounded-lg"><span class="text-green-600 font-bold">정답</span><span class="font-black text-green-700">${S.correct}개</span></div>
-      <div class="flex justify-between p-2 bg-red-50 rounded-lg"><span class="text-red-500 font-bold">오답</span><span class="font-black text-red-600">${S.incorrect}개</span></div>
-      <div class="flex justify-between p-2 bg-blue-50 rounded-lg"><span class="text-blue-600 font-bold">시간</span><span class="font-black text-blue-700">${Math.floor(dur/60)}분 ${dur%60}초</span></div>
-      <div class="flex justify-between p-2 bg-amber-50 rounded-lg"><span class="text-amber-700 font-bold">점수</span><span id="sessScore" class="font-black text-amber-700">계산 중...</span></div>
-    </div>
-    <div id="sessScoreNote" class="text-sm font-bold text-gray-500 mb-4">점수 계산 중...</div>
-    <button onclick="Session.exit()" class="w-full py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition">돌아가기</button>
+    ${head}
+    <div class="res-row"><span class="text-green-600">⭕ ${S.correct}</span><span class="text-red-500">❌ ${S.incorrect}</span><span class="${over ? 'text-orange-600' : 'text-indigo-600'}">⏱ ${mmss(dur)}</span></div>
+    ${over ? '<div class="mb-3 text-sm font-bold text-orange-600">시간이 지났어요</div>' : ''}
+    ${passNote}
+    <div class="mb-4 text-sm text-gray-500">점수 <b id="sessScore" class="text-amber-700">계산 중...</b> · <span id="sessScoreNote">저장 중...</span></div>
+    <div class="flex flex-col gap-3">${buttons}
+      <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
   </div>`;
 }
 
@@ -177,10 +186,10 @@ function showScore(r) {
   if (!v || !n) return;
   v.textContent = r && r.displayScore != null ? `${r.displayScore}점` : '기록 없음';
   n.textContent = r ? (r.message || '') : '저장 실패';
-  n.className = r && r.isError ? 'text-sm font-bold text-red-500'
-              : r && r.pending ? 'text-sm font-bold text-amber-600'
-              : r && r.scoreRecorded ? 'text-sm font-bold text-green-600'
-              : 'text-sm font-bold text-gray-500';
+  n.className = r && r.isError ? 'font-bold text-red-500'
+              : r && r.pending ? 'font-bold text-amber-600'
+              : r && r.scoreRecorded ? 'font-bold text-green-600'
+              : 'text-gray-500';
 }
 
 /* ── 풀던 중 '뒤로 가기'·창 닫기 막기 ──
@@ -208,9 +217,12 @@ window.addEventListener('beforeunload', e => {
   e.returnValue = '';
 });
 
-function exit() {
+function exit(after) {
+  if (typeof after !== 'string') after = undefined;   // 'again' | 'next' | 없음
   stopTimer();
-  if (guarded && !leavingByBack) {   // '그만하기'·'돌아가기'로 나갈 때는 쌓아 둔 칸을 치운다
+  // '한 번 더'는 곧바로 새 도전을 시작하므로 쌓아 둔 칸을 그대로 넘겨준다.
+  // (history.back() 은 비동기라, 치우고 바로 새 칸을 쌓으면 뒤늦은 '뒤로'가 새 도전을 끝내 버린다)
+  if (guarded && !leavingByBack && after !== 'again') {   // '그만하기'·'목록으로'로 나갈 때는 쌓아 둔 칸을 치운다
     guarded = false;
     try { history.back(); } catch (e) {}
   }
@@ -220,7 +232,7 @@ function exit() {
   if (!S.saved && S.solved > 0) { S.saved = true; DB.saveResult(App.classCode, buildPayload()).catch(() => {}); }
   const area = document.getElementById('practiceArea');
   area.classList.add('hidden'); area.innerHTML = '';
-  if (S.onExit) S.onExit();
+  if (S.onExit) S.onExit(after);
 }
 
 window.Session = {

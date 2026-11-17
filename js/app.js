@@ -5,7 +5,7 @@ const L = window.Levels;
 const state = {
   classCode: null, className: '',
   studentNo: null, studentName: '',
-  level: null, bestScores: {}, chart: null,
+  level: null, bestScores: {},
   progress: { passed: {}, recent: {} },   // 통과한 레벨 · 레벨별 최근 문제 정오 (규칙은 levels.js)
   loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
 };
@@ -14,9 +14,14 @@ const $ = id => document.getElementById(id);
 const show = id => $(id).classList.remove('hidden');
 const hide = id => $(id).classList.add('hidden');
 const SCREENS = ['classEntry','studentSelection','studentPinScreen','levelSelection','modeSelection',
-                 'practiceArea','historyArea','rankingArea',
+                 'practiceArea',
                  'teacherLogin','teacherHome','teacherClass'];
-function only(...ids) { SCREENS.forEach(hide); ids.forEach(show); }
+/** 화면 하나만 보이기. 문제를 푸는 동안에는 위쪽 제목줄도 숨겨 문제가 화면 위로 올라오게 한다 */
+function only(...ids) {
+  SCREENS.forEach(hide); ids.forEach(show);
+  $('appHeader').classList.toggle('hidden', ids.includes('practiceArea'));
+}
+const titleFor = no => `${no}번 · 연산 마스터`;
 
 const remember = {
   get() { try { return localStorage.getItem('mp.lastClass') || ''; } catch (e) { return ''; } },
@@ -103,7 +108,7 @@ function loadStudents(studentParam) {
       if (found) {
         resetStudent();
         state.studentNo = found.number; state.studentName = found.name;
-        $('gameTitle').textContent = `${found.name} 학생의 연산 마스터`;
+        $('gameTitle').textContent = titleFor(found.number);
         DB.verifyStudentPin(state.classCode, found.number, '').then(r => {
           if (r.ok) loadLevels(); else goToPin();
         });
@@ -136,13 +141,13 @@ function selectStudent(no, name, btn) {
   const go = $('goToPinBtn');
   go.disabled = false;
   go.classList.replace('bg-gray-300','bg-orange-500');
-  $('gameTitle').textContent = `${name} 학생의 연산 마스터`;
+  $('gameTitle').textContent = titleFor(no);
 }
 
 /* ═══ 학생 PIN ═══ */
 function goToPin() {
   only('studentPinScreen');
-  $('studentPinTitle').textContent = `${state.studentName} 학생, 비밀번호를 입력하세요`;
+  $('studentPinTitle').textContent = `${state.studentNo}번, 비밀번호를 써요`;
   $('studentPinInput').value = '';
   $('studentPinMessage').textContent = '';
   $('studentPinInput').focus();
@@ -211,10 +216,22 @@ function retryLoadLevels() {
   loadLevels();
 }
 
+/** 오늘 할 것 — 아직 통과하지 못한 레벨 중 도전이 열린 첫 레벨. 다 통과했으면 null */
+function nextLevel() {
+  return L.LEVEL_ORDER.find(lv => !state.progress.passed[lv] && L.isLevelUnlocked(lv, state.progress.passed)) || null;
+}
+/** 목록에서 바로 다음 레벨 (결과 화면의 '다음 레벨로' 버튼) */
+function levelAfter(lv) {
+  const i = L.LEVEL_ORDER.indexOf(lv);
+  return i >= 0 && i + 1 < L.LEVEL_ORDER.length ? L.LEVEL_ORDER[i + 1] : null;
+}
+
+/** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
+ *  잠긴 레벨도 누르면 카드에서 무엇을 먼저 통과해야 하는지 보여 준다. 잠금 계산은 levels.js 그대로.
+ *  (자유 연습 버튼은 2026-11-17 선생님 결정으로 뺐다 — 학생 화면은 '도전' 하나. 예전 free 기록은 그대로 남고 읽힌다) */
 function renderLevelButtons() {
   const container = $('levelList');
   container.innerHTML = '';
-  let group = '', groupDiv = null;
 
   if (state.loadFailed) {
     const hasAny = Object.keys(state.bestScores).length > 0;
@@ -225,125 +242,120 @@ function renderLevelButtons() {
     container.appendChild(warn);
   }
 
+  const next = nextLevel();
+  const card = document.createElement('div');
+  card.className = 'next-card';
+  if (next) {
+    const cfg = L.LEVEL_CONFIGS[next];
+    card.innerHTML = `<span class="next-k">오늘 할 것</span>
+      <button class="next-t" data-act="card"><b>${next}</b>${cfg.label}</button>
+      ${Session.windowHTML(next, state.progress.recent[next] || [], false)}
+      <button class="big-btn big-go" data-act="go">🔥 도전 시작</button>`;
+    card.querySelector('[data-act=card]').onclick = () => selectLevel(next);
+    card.querySelector('[data-act=go]').onclick = () => { state.level = next; startPractice('challenge'); };
+  } else {
+    card.innerHTML = `<span class="next-k">오늘 할 것</span>
+      <div class="next-t">모든 레벨을 통과했어요! 🎉</div>
+      <div class="text-sm font-bold text-orange-800">아래에서 다시 풀고 싶은 레벨을 골라요.</div>`;
+  }
+  container.appendChild(card);
+
+  // 묶음(그룹)별로 칩을 만든다
+  const groups = [];
   L.LEVEL_ORDER.forEach(lv => {
-    const cfg = L.LEVEL_CONFIGS[lv], t = cfg.theme;
-    const max = L.LEVEL_MAX[lv], best = state.bestScores[lv] || 0;
-    const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
-    const passed = !!state.progress.passed[lv];
-
-    if (cfg.group !== group) {
-      group = cfg.group;
-      const section = document.createElement('div');
-      section.innerHTML = `<h3 class="text-sm font-black text-gray-500 mb-2 px-1">${L.GROUP_LABELS[group]}</h3>`;
-      groupDiv = document.createElement('div');
-      groupDiv.className = 'flex flex-col gap-2';
-      section.appendChild(groupDiv);
-      container.appendChild(section);
-    }
-
-    const scoreBadge = best >= max
-      ? '<span class="lv-badge bg-green-100 text-green-700">✅ 만점</span>'
-      : best > 0 ? `<span class="lv-badge bg-yellow-100 text-yellow-700">최고 ${best}점</span>` : '';
-    // 통과 표시 — 만점 배지가 있으면 겹치지 않게 생략. 아직 통과 전이면 최근 문제에서 맞힌 개수를 보여 준다
-    const w = L.passWindow(lv), rec = state.progress.recent[lv] || [];
-    const passBadge = passed
-      ? (best >= max ? '' : '<span class="lv-badge bg-green-100 text-green-700">통과</span>')
-      : rec.length ? `<span class="lv-badge bg-gray-200 text-gray-500">최근 ${L.windowCorrect(rec)}/${w.need}</span>` : '';
-    const badge = scoreBadge + passBadge;
-    const lock = unlocked ? '' : '<span class="lv-badge bg-gray-200 text-gray-500">🔒 도전 잠김</span>';
-    const kind = cfg.engine === 'choice' ? '⚡ 4지선다' : '📝 단계 풀이';
-
-    const btn = document.createElement('button');
-    btn.className = `w-full py-3 ${t.bg} border-2 ${t.border} rounded-2xl ${t.hbg} transition text-left px-4`;
-    btn.onclick = () => selectLevel(lv);
-    btn.innerHTML = `<span class="font-black ${t.lbl}">${lv}</span>
-      <span class="${t.descCls} text-sm">${kind} ${cfg.label} (만점 ${max})</span>${badge}${lock}`;
-    groupDiv.appendChild(btn);
+    const g = L.LEVEL_CONFIGS[lv].group;
+    if (!groups.length || groups[groups.length - 1].key !== g) groups.push({ key: g, levels: [] });
+    groups[groups.length - 1].levels.push(lv);
   });
+  const groupEl = g => {
+    const done = g.levels.filter(lv => state.progress.passed[lv]).length;
+    const el = document.createElement('div');
+    el.className = 'lv-grp';
+    el.innerHTML = `<div class="lv-gh"><span>${L.GROUP_LABELS[g.key]}</span><span>${done}/${g.levels.length}</span></div><div class="lv-chips"></div>`;
+    const chips = el.querySelector('.lv-chips');
+    g.levels.forEach(lv => {
+      const passed = !!state.progress.passed[lv];
+      const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
+      const b = document.createElement('button');
+      b.className = 'lv-chip ' + (lv === next ? 'now' : passed ? 'done' : unlocked ? '' : 'lock');
+      b.textContent = lv + (passed ? ' ✓' : unlocked ? '' : ' 🔒');
+      b.title = L.LEVEL_CONFIGS[lv].label;
+      b.onclick = () => selectLevel(lv);
+      chips.appendChild(b);
+    });
+    return el;
+  };
+
+  const finished = groups.filter(g => g.levels.every(lv => state.progress.passed[lv]));
+  const rest = groups.filter(g => !finished.includes(g));
+  rest.forEach(g => container.appendChild(groupEl(g)));
+  if (finished.length) {
+    const fold = document.createElement('details');
+    fold.className = 'lv-fold';
+    const first = finished[0].levels[0], lastG = finished[finished.length - 1];
+    fold.innerHTML = `<summary>끝낸 레벨 ${first}~${lastG.levels[lastG.levels.length - 1]} 보기</summary><div></div>`;
+    finished.forEach(g => fold.lastElementChild.appendChild(groupEl(g)));
+    container.appendChild(fold);
+  }
 }
 
+/** 레벨 카드 — 이름 · 짧은 설명 · 푼 예시 하나 · 최근 문제 점 · 도전 버튼 */
 function selectLevel(lv) {
   state.level = lv;
   const cfg = L.LEVEL_CONFIGS[lv];
-  $('modeTitle').textContent = `${lv} — ${cfg.label}`;
+  $('modeLevel').textContent = lv;
+  $('modeTitle').textContent = cfg.label;
   $('modeDesc').textContent = cfg.desc;
+  $('modeExample').innerHTML = exampleHTML(lv, cfg);
 
   const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
-  const btn = $('challengeBtn'), title = $('challengeTitle'), info = $('challengeInfo');
+  const passed = !!state.progress.passed[lv];
+  $('modeWindow').innerHTML = unlocked ? Session.windowHTML(lv, state.progress.recent[lv] || [], passed) : '';
+  const btn = $('challengeBtn');
   if (unlocked) {
     btn.disabled = false;
     btn.onclick = () => startPractice('challenge');
-    btn.className = 'w-full py-5 bg-red-50 border-2 border-red-200 rounded-2xl hover:bg-red-100 hover:border-red-400 transition text-left px-5';
-    title.textContent = '🔥 도전 연습';
-    title.className = 'text-lg font-black text-red-800';
-    info.innerHTML = `${cfg.chalQ}문제 · 제한시간 ${cfg.chalTime}초 · 점수 기록됨
-      <div class="mt-2">${Session.windowHTML(lv, state.progress.recent[lv] || [], !!state.progress.passed[lv])}</div>
-      <div class="text-xs mt-1">그만두고 다시 시작해도 틀린 문제는 그대로 남아요. 계속 풀어서 채워 보세요!</div>`;
-    info.className = 'text-sm text-red-600 mt-1';
+    btn.className = 'big-btn big-go';
+    btn.innerHTML = `🔥 도전 (${cfg.chalQ}문제)`;
   } else {
     const prev = L.getPrevLevelInfo(lv, state.progress);
     btn.disabled = true;
     btn.onclick = null;
-    btn.className = 'w-full py-5 bg-gray-100 border-2 border-gray-200 rounded-2xl text-left px-5 opacity-60 cursor-not-allowed';
-    title.textContent = '🔒 도전 연습 (잠김)';
-    title.className = 'text-lg font-black text-gray-400';
-    info.textContent = `${prev.level} 도전에서 최근 ${prev.size}문제 중 ${prev.need}개를 맞히면 열려요 — 지금 ${prev.correct}개`;
-    info.className = 'text-sm text-gray-400 mt-1';
+    btn.className = 'big-btn big-lock';
+    btn.innerHTML = `🔒 ${prev.level} 먼저 통과해요<small>${prev.level} 도전 최근 ${prev.size}문제 중 ${prev.need}개 · 지금 ${prev.correct}개</small>`;
   }
+  only('modeSelection');
+}
 
-  only('modeSelection', 'historyArea', 'rankingArea');
-  loadHistoryAndRanking();
+/** 4지선다 레벨은 문제 하나를 만들어 정답과 함께 보여 준다 (설명을 덜 읽어도 할 일이 보이게). 과정형은 생략 */
+function exampleHTML(lv, cfg) {
+  if (cfg.engine !== 'choice') return '';
+  try {
+    const q = Gen.generateChoiceSet(lv, 1)[0];
+    const ans = q.choices.find(c => c.correct);
+    if (!ans) return '';
+    return `<div class="ex-box"><span class="ex-lbl">예시</span><div class="quiz-q">${q.display}</div>
+      <div class="ex-ans">정답 ➜ ${ans.html}</div></div>`;
+  } catch (e) { return ''; }
 }
 
 function startPractice(mode) {
   const cfg = L.LEVEL_CONFIGS[state.level];
   only('practiceArea');
-  const back = () => backToLevels();
+  const back = after => backToLevels(after);
   if (cfg.engine === 'choice') Quiz.init(state.level, mode, cfg, back);
   else                         StepFrac.init(state.level, mode, cfg, back);
 }
 
-function backToLevels() {
+/** 연습이 끝나고 돌아올 때. after = 'again'(한 번 더) | 'next'(다음 레벨 카드) | 없음(목록) */
+function backToLevels(after) {
   // 방금 저장한 기록은 db.js 가 캐시에 덧붙여 두므로 캐시를 비우지 않는다 (비우면 기록을 전부 다시 읽음)
-  loadLevels();
-}
-
-/* ═══ 성장 그래프 · 랭킹 ═══ */
-function loadHistoryAndRanking() {
-  $('chartLoading').classList.remove('hidden');
-  Promise.all([DB.getHistory(state.classCode, state.studentNo), DB.getRanking(state.classCode, 5)]).then(([hist, rank]) => {
-    $('chartLoading').classList.add('hidden');
-    renderDelta(hist);
-    renderChart(hist);
-    renderRankingTable('rankingTableBody', rank, '아직 랭킹이 없습니다.');
-  }).catch(() => {
-    $('chartLoading').classList.add('hidden');
-    renderRankingTable('rankingTableBody', [], '랭킹을 불러오지 못했습니다.');
-  });
-}
-
-function renderDelta(hist) {
-  const box = $('deltaBox');
-  if (hist.length < 2) { box.innerHTML = '<div class="text-center text-sm text-gray-400 mb-2">점수 기록이 쌓이면 변화를 보여드려요!</div>'; return; }
-  const cur = hist[hist.length - 1].score, prev = hist[hist.length - 2].score, d = cur - prev;
-  const cls = d > 0 ? 'text-red-500' : d < 0 ? 'text-blue-500' : 'text-gray-500';
-  const icon = d > 0 ? '▲' : d < 0 ? '▼' : '−';
-  box.innerHTML = `<div class="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm mb-2 border-l-4 border-orange-400">
-    <div class="text-sm text-gray-500">지난 <b>${prev}</b></div>
-    <div class="font-bold text-lg ${cls}">${icon} ${Math.abs(d).toFixed(1)}점</div>
-    <div class="text-sm text-gray-800">최근 <b>${cur}</b></div></div>`;
-}
-
-function renderChart(hist) {
-  if (typeof Chart === 'undefined') return;
-  const ctx = $('historyChart').getContext('2d');
-  if (state.chart) state.chart.destroy();
-  state.chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels: hist.map(h => h.label),
-            datasets: [{ label:'내 점수', data: hist.map(h => h.score),
-                         borderColor:'#f97316', backgroundColor:'rgba(249,115,22,0.1)', fill:true, tension:0.3 }] },
-    options: { responsive:true, maintainAspectRatio:false }
+  const lv = state.level;
+  fetchBestScores().then(() => {
+    renderLevelButtons();
+    if (after === 'again' && lv) { state.level = lv; startPractice('challenge'); }
+    else if (after === 'next' && levelAfter(lv)) selectLevel(levelAfter(lv));
+    else only('levelSelection');
   });
 }
 
@@ -374,7 +386,7 @@ return {
   isPassed(lv) { return !!state.progress.passed[lv]; },
   only, showClassEntry, submitClassCode, leaveClass,
   goToPin, submitStudentPin, backToStudents,
-  selectLevel, startPractice, backToLevels, retryLoadLevels,
+  selectLevel, startPractice, backToLevels, retryLoadLevels, levelAfter,
   renderRankingTable
 };
 })();
