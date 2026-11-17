@@ -19,11 +19,12 @@ function init(lv, mode, config, onExit) {
 function render() {
   const area = document.getElementById('practiceArea');
   area.classList.remove('hidden');
-  area.innerHTML = `${Session.headerHTML()}
+  area.innerHTML = `${Session.headerHTML()}${Scratch.wrap(cfg, `
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
       <div class="text-center text-xs text-gray-400 font-black mb-4 tracking-widest">${cfg.label}</div>
       <div id="quizBody"></div>
-    </div>`;
+    </div>`)}`;
+  Scratch.mount();   // 종이 계산이 필요한 레벨(cfg.scratch)만 계산 연습장이 붙는다
 }
 
 function refill() { queue = Gen.generateChoiceSet(level, 20); }
@@ -32,6 +33,7 @@ function nextQuestion() {
   if (!queue.length) refill();
   cur = queue.shift();
   waiting = false;
+  Scratch.clear();
   document.getElementById('quizBody').innerHTML = `
     <div class="text-center mb-6"><div class="quiz-q">${cur.display}</div></div>
     <div id="quizChoices" class="grid grid-cols-2 gap-3"></div>

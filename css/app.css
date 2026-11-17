@@ -167,3 +167,42 @@
 .sx-free{font-size:.75rem;font-weight:800;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9999px;padding:.15rem .6rem;white-space:nowrap}
 .res-big{font-size:1.9rem;font-weight:900;margin-bottom:.5rem}
 .res-row{display:flex;justify-content:center;gap:1.2rem;font-size:1.1rem;font-weight:900;margin-bottom:.75rem;font-variant-numeric:tabular-nums}
+/* 기초 연산 — 숫자 직접 입력 (js/numinput.js) */
+.num-q{font-size:2.2rem;gap:.15rem;word-break:keep-all}
+.num-q span:only-child{font-size:1.5rem;line-height:1.4}
+@media(max-width:420px){.num-q{font-size:1.7rem}}
+.num-fields{display:flex;justify-content:center;gap:.6rem;flex-wrap:wrap}
+.num-field{min-width:8rem;max-width:100%;flex:1 1 8rem;min-height:3.6rem;padding:.4rem .8rem;border:3px solid #e5e7eb;border-radius:1rem;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.num-field.on{border-color:var(--c-main);background:var(--c-main-soft)}
+.num-field.ok{border-color:var(--c-ok);background:var(--c-ok-soft)}
+.num-field.no{border-color:var(--c-no);background:var(--c-no-soft)}
+.num-lbl{font-size:.75rem;font-weight:800;color:#6b7280}
+.num-val{font-size:1.8rem;font-weight:900;color:#1f2937;font-variant-numeric:tabular-nums;min-height:2.2rem;word-break:break-all}
+.num-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.6rem;max-width:22rem;margin-left:auto;margin-right:auto}
+.num-key{padding:.85rem 0;border-radius:.9rem;background:#f3f4f6;font-size:1.5rem;font-weight:900;color:#1f2937;transition:.1s}
+.num-key:active{transform:scale(.96);background:#e5e7eb}
+.num-del{color:#6b7280}
+.num-ok{grid-column:1/-1;background:var(--c-main);color:#fff;font-size:1.25rem}
+.num-ok:active{background:var(--c-main-dark)}
+.lv-chip.skip{background:#f8fafc;color:#94a3b8;border-color:#e2e8f0;border-style:dashed}
+.lv-track{font-size:1rem;font-weight:900;color:#1f2937;margin-top:.4rem;padding:0 .15rem}
+.next-sub{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid var(--c-main-line);border-radius:.9rem;padding:.55rem .75rem;font-size:.95rem;font-weight:800;color:#1e293b;text-align:left}
+.next-sub b{color:var(--c-main-dark)}
+/* 계산 연습장 — 넓은 화면은 문제 오른쪽, 좁은 화면(태블릿 세로·폰)은 아래 */
+body.num-wide .app-shell{max-width:64rem}
+.num-layout{display:grid;grid-template-columns:1fr;gap:1rem}
+@media(min-width:900px){.num-layout{grid-template-columns:minmax(0,26rem) minmax(0,1fr)}}
+.scratch{background:#fff;border:1px solid #e5e7eb;border-radius:1rem;box-shadow:0 4px 12px rgba(0,0,0,.05);padding:.6rem;display:flex;flex-direction:column;gap:.4rem}
+.scratch-head{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;font-weight:900;color:#6b7280;padding:0 .2rem}
+.scratch-clear{padding:.35rem .9rem;border-radius:9999px;background:#f3f4f6;color:#374151;font-size:.85rem;font-weight:900}
+.scratch-clear:active{background:#e5e7eb}
+#scratchCanvas{width:100%;height:320px;border-radius:.75rem;touch-action:none;cursor:crosshair;
+  background-color:#fffef7;background-image:linear-gradient(#e8eef7 1px,transparent 1px),linear-gradient(90deg,#e8eef7 1px,transparent 1px);background-size:28px 28px}
+@media(min-width:900px){#scratchCanvas{flex:1;height:auto;min-height:520px}}
+/* 교사 화면 — 기초 연산 통과 현황 */
+.bb-table th{text-align:center;white-space:nowrap}
+.bb-cell{text-align:center;padding:.45rem .25rem;font-weight:800;font-size:.8rem;min-width:2.6rem;font-variant-numeric:tabular-nums}
+.bb-pass{background:var(--c-ok-soft);color:var(--c-ok)}
+.bb-try{color:var(--c-main-dark)}
+.bb-skip{color:#cbd5e1}
+.bb-now{box-shadow:inset 0 0 0 2px var(--c-main);border-radius:.4rem}

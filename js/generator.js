@@ -734,9 +734,79 @@ function generateStepProblem(level) {
     case 'nat-mul-mixed-improper': return genMixedMulNat('mixed-mul-nat-improper', true);
     case 'frac-mul-frac':          return genFracMulFrac();
     case 'mixed-mul-mixed':        return genMixedMulMixed();
-    default:          return genDiffSub();
+    // 예전에는 모르는 유형이 조용히 뺄셈 문제로 바뀌었다. 레벨 설정이 틀린 것이므로 바로 드러나게 한다
+    default: throw new Error(`과정 문제 유형을 모름: ${level} / ${cfg && cfg.op}`);
   }
 }
 
-window.Gen = { generateStepProblem, generateChoiceSet, fracAnswer };
+/* ═══════════ 기초 연산 (숫자 직접 입력, js/numinput.js) ═══════════
+ * 문제 = { display: HTML, fields: [{ label, ans, list? }] }
+ *   ans  : 정답 숫자 (list 이면 숫자 배열 — 순서 상관없이 같은 수들을 다 쓰면 정답)
+ *   label: 칸 이름 ('몫', '나머지' 등). 칸이 하나면 비워 둔다
+ */
+const opHTML = (a, op, b) => `<span>${a}</span><span class="q-op">${op}</span><span>${b}</span><span class="q-op">=</span>`;
+const one = (display, ans) => ({ display, fields: [{ label: '', ans }] });
+const divQR = (a, b) => ({ display: opHTML(a, '÷', b),
+  fields: [{ label: '몫', ans: Math.floor(a / b) }, { label: '나머지', ans: a % b }] });
+
+/** 받아내림이 한 번 이상 있는 세 자리 − 세 자리 (답은 양수) */
+function genSub3() {
+  for (;;) {
+    const a = randInt(200, 999), b = randInt(100, a - 1);
+    const borrowOnes = (a % 10) < (b % 10);
+    const borrowTens = (Math.floor(a / 10) % 10) - (borrowOnes ? 1 : 0) < (Math.floor(b / 10) % 10);
+    if ((borrowOnes || borrowTens) && a - b >= 10) return one(opHTML(a, '−', b), a - b);
+  }
+}
+function genMul1() {   // (두·세 자리) × (한 자리)
+  const a = Math.random() < 0.5 ? randInt(12, 99) : randInt(102, 999), b = randInt(2, 9);
+  return one(opHTML(a, '×', b), a * b);
+}
+function nonRound(lo, hi) { for (;;) { const n = randInt(lo, hi); if (n % 10) return n; } }
+function genMul22() { const a = nonRound(12, 99), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
+function genMul32() { const a = nonRound(102, 999), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
+function genDiv99() { const b = randInt(2, 9), q = randInt(2, 9); return one(opHTML(b * q, '÷', b), q); }
+function genDiv21() {   // 두 자리 ÷ 한 자리, 몫이 두 자리일 때가 많게
+  for (;;) { const b = randInt(2, 9), a = randInt(10, 99); if (Math.floor(a / b) >= 3) return divQR(a, b); }
+}
+function genDiv31() { const b = randInt(2, 9), a = randInt(100, 999); return divQR(a, b); }
+function genDivX2() {   // ÷ 두 자리 — 예: 458 ÷ 17 = 26 … 16
+  for (;;) {
+    const b = randInt(11, 49), q = randInt(2, 39), r = randInt(0, b - 1), a = b * q + r;
+    if (a >= 50 && a <= 999) return divQR(a, b);
+  }
+}
+function divisorsOf(n) { const d = []; for (let i = 1; i <= n; i++) if (n % i === 0) d.push(i); return d; }
+function genDivisors() {   // 약수가 4개 이상인 6~60
+  for (;;) {
+    const n = randInt(6, 60), d = divisorsOf(n);
+    if (d.length >= 4) return { display: `<span>${n}의 약수를 모두 쓰세요</span>`, fields: [{ label: '', ans: d, list: true }] };
+  }
+}
+function genMultiples() {
+  const kind = pick(['mult', 'common', 'lcm']);
+  if (kind === 'mult') {
+    const a = randInt(3, 15);
+    return { display: `<span>${a}의 배수를 작은 수부터 4개 쓰세요</span>`, fields: [{ label: '', ans: [a, 2 * a, 3 * a, 4 * a], list: true }] };
+  }
+  let a, b;
+  do { a = randInt(2, 12); b = randInt(2, 12); } while (a === b || a % b === 0 || b % a === 0);
+  const m = lcm(a, b);
+  if (kind === 'common') return { display: `<span>${a}${window.Frac.josa(a, '과', '와')} ${b}의 공배수를 작은 수부터 3개 쓰세요</span>`, fields: [{ label: '', ans: [m, 2 * m, 3 * m], list: true }] };
+  return { display: `<span>${a}${window.Frac.josa(a, '과', '와')} ${b}의 최소공배수는?</span>`, fields: [{ label: '', ans: m }] };
+}
+const NUM_GENS = {
+  'b-sub3': genSub3, 'b-mul-1': genMul1, 'b-mul-22': genMul22, 'b-mul-32': genMul32,
+  'b-div-99': genDiv99, 'b-div-21': genDiv21, 'b-div-31': genDiv31, 'b-div-x2': genDivX2,
+  'b-divisors': genDivisors, 'b-multiples': genMultiples
+};
+
+function generateNumProblem(level) {
+  const cfg = window.Levels.LEVEL_CONFIGS[level];
+  const gen = cfg && NUM_GENS[cfg.type];
+  if (!gen) throw new Error(`기초 문제 유형을 모름: ${level} / ${cfg && cfg.type}`);
+  return gen();
+}
+
+window.Gen = { generateStepProblem, generateChoiceSet, generateNumProblem, fracAnswer, divisorsOf };
 })();

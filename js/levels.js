@@ -1,9 +1,48 @@
-/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산 (37레벨: 분수·소수·분수의 곱셈) */
+/* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산
+ * 트랙 두 개:
+ *   기초 연산 B1~B10 — 숫자를 직접 써넣는다. 항상 열려 있다(앞 레벨을 통과하지 않아도 도전 가능).
+ *   분수·소수 L1~L36 + L9-2 (37레벨) — 앞 레벨을 통과해야 다음 레벨 도전이 열린다.
+ */
 
+/** 분수·소수 트랙의 순서. 잠금·랭킹의 '최고 레벨'이 이 순서를 쓴다. (이름은 예전 그대로 둔다) */
 const LEVEL_ORDER = ['L1','L2','L3','L4','L5','L6','L7','L8','L9','L9-2','L10','L11',
                      'L12','L13','L14','L15','L16','L17','L18','L19','L20','L21','L22',
                      'L23','L24','L25','L26','L27',
                      'L28','L29','L30','L31','L32','L33','L34','L35','L36'];
+
+/** 기초 연산 트랙 — 줄(뺄셈·곱셈·나눗셈·약수와 배수)마다 쉬운 것부터 */
+const BASIC_LINES = Object.freeze({
+  sub: ['B1'],
+  mul: ['B2', 'B3', 'B4'],
+  div: ['B5', 'B6', 'B7', 'B8'],
+  fm:  ['B9', 'B10']
+});
+const BASIC_ORDER = [].concat(BASIC_LINES.sub, BASIC_LINES.mul, BASIC_LINES.div, BASIC_LINES.fm);
+
+/** 트랙 — 화면에 보이는 순서대로. open: true 면 레벨이 모두 항상 열려 있다 */
+const TRACKS = Object.freeze({
+  basic: { label: '기초 연산', levels: BASIC_ORDER, open: true },
+  frac:  { label: '분수 · 소수', levels: LEVEL_ORDER, open: false }
+});
+const TRACK_KEYS = ['basic', 'frac'];
+/** 모든 레벨 (트랙 순서대로) */
+const ALL_LEVELS = [].concat(...TRACK_KEYS.map(k => TRACKS[k].levels));
+
+function trackOf(level) { return TRACK_KEYS.find(k => TRACKS[k].levels.indexOf(level) !== -1) || null; }
+/** 같은 트랙에서 바로 앞 레벨 — 트랙의 첫 레벨이면 null */
+function prevInTrack(level) {
+  const t = trackOf(level); if (!t) return null;
+  const list = TRACKS[t].levels, i = list.indexOf(level);
+  return i > 0 ? list[i - 1] : null;
+}
+/** 같은 트랙에서 바로 다음 레벨 — 기초 트랙은 같은 줄 안에서만 (B4 다음은 B5가 아니라 없음) */
+function nextInTrack(level) {
+  const t = trackOf(level); if (!t) return null;
+  let list = TRACKS[t].levels;
+  if (t === 'basic') list = Object.values(BASIC_LINES).find(l => l.indexOf(level) !== -1);
+  const i = list.indexOf(level);
+  return i >= 0 && i + 1 < list.length ? list[i + 1] : null;
+}
 
 /** 레벨별 만점 — 숫자로 고정한다. 계산식으로 만들지 말 것.
  *  예전 기록의 점수·통과 판정이 이 값에 묶여 있어서, 레벨을 앞이나 중간에 끼워 넣어도 기존 값은 바뀌면 안 된다.
@@ -16,7 +55,9 @@ const LEVEL_MAX = Object.freeze({
   'L15': 160, 'L16': 165, 'L17': 170, 'L18': 175,
   'L19': 180, 'L20': 185, 'L21': 190, 'L22': 195,
   'L23': 200, 'L24': 205, 'L25': 210, 'L26': 215, 'L27': 220,
-  'L28': 225, 'L29': 230, 'L30': 235, 'L31': 240, 'L32': 245, 'L33': 250, 'L34': 255, 'L35': 260, 'L36': 265
+  'L28': 225, 'L29': 230, 'L30': 235, 'L31': 240, 'L32': 245, 'L33': 250, 'L34': 255, 'L35': 260, 'L36': 265,
+  // 기초 연산 — 결과 화면에 보이는 점수만. 랭킹 합계에는 넣지 않는다(db.js getRanking 은 LEVEL_ORDER 레벨만 더함)
+  'B1': 100, 'B2': 100, 'B3': 100, 'B4': 100, 'B5': 100, 'B6': 100, 'B7': 100, 'B8': 100, 'B9': 100, 'B10': 100
 });
 
 /** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
@@ -31,7 +72,11 @@ const GROUP_LABELS = {
   mixed:   '🎯 대분수',
   dec:     '🔢 소수 계산',
   mul:     '✖️ 분수의 곱셈 ① — 분수 × 자연수',
-  mul2:    '✖️ 분수의 곱셈 ② — 자연수 × 분수 · 분수 × 분수'
+  mul2:    '✖️ 분수의 곱셈 ② — 자연수 × 분수 · 분수 × 분수',
+  'b-sub': '➖ 뺄셈',
+  'b-mul': '✖️ 곱셈',
+  'b-div': '➗ 나눗셈',
+  'b-fm':  '🔢 약수와 배수'
 };
 
 /* 제한시간 = 문제 수 × 유형별 단가(초)
@@ -41,6 +86,33 @@ const GROUP_LABELS = {
  *   대분수 × 대분수 과정형은 가분수 2번 + 큰 수 곱셈이라 90초 · 4지선다 30초
  */
 const T = (q, per) => q * per;
+
+const BTHEME = {bg:'bg-slate-50', border:'border-slate-200', hbg:'hover:bg-slate-100', lbl:'text-slate-800', descCls:'text-slate-600'};
+
+/* 기초 연산 — engine 'num' (js/numinput.js): 보기 없이 숫자를 직접 써넣는다. 문제는 generator.js 의 type 으로 만든다.
+ * 제한시간 단가: 한 줄 계산 20~25초 · 두 자리 곱셈 40초 · 큰 곱셈·나눗셈 50~60초 · 구구 나눗셈 8초 */
+const BASIC_CONFIGS = {
+  B1:  { group:'b-sub', engine:'num', type:'b-sub3',   chalQ:20, chalTime:T(20,25), open:true,
+         label:'받아내림 있는 세 자리 뺄셈', desc:'일의 자리부터 — 모자라면 윗자리에서 10을 빌려 와요', theme:BTHEME },
+  B2:  { group:'b-mul', engine:'num', type:'b-mul-1',  chalQ:20, chalTime:T(20,20), open:true,
+         label:'(두·세 자리) × (한 자리)', desc:'일의 자리부터 곱하고 올림을 더해요', theme:BTHEME },
+  B3:  { group:'b-mul', engine:'num', type:'b-mul-22', chalQ:20, chalTime:T(20,40), open:true,
+         label:'(두 자리) × (두 자리)', desc:'일의 자리 곱 + 십의 자리 곱(한 칸 왼쪽)', theme:BTHEME },
+  B4:  { group:'b-mul', engine:'num', type:'b-mul-32', chalQ:10, chalTime:T(10,60), open:true,
+         label:'(세 자리) × (두 자리)', desc:'연습장에 세로로 써서 계산해요', theme:BTHEME },
+  B5:  { group:'b-div', engine:'num', type:'b-div-99', chalQ:20, chalTime:T(20,8),  open:true,
+         label:'곱셈구구 나눗셈', desc:'21 ÷ 7 = 3 — 곱셈구구를 거꾸로', theme:BTHEME },
+  B6:  { group:'b-div', engine:'num', type:'b-div-21', chalQ:20, chalTime:T(20,25), open:true,
+         label:'(두 자리) ÷ (한 자리)', desc:'몫과 나머지를 써요 — 나머지는 나누는 수보다 작아요', theme:BTHEME },
+  B7:  { group:'b-div', engine:'num', type:'b-div-31', chalQ:20, chalTime:T(20,35), open:true,
+         label:'(세 자리) ÷ (한 자리)', desc:'몫과 나머지를 써요', theme:BTHEME },
+  B8:  { group:'b-div', engine:'num', type:'b-div-x2', chalQ:10, chalTime:T(10,60), open:true,
+         label:'÷ (두 자리)', desc:'몫을 어림해서 곱해 보고 고쳐요 · 몫과 나머지', theme:BTHEME },
+  B9:  { group:'b-fm',  engine:'num', type:'b-divisors', chalQ:10, chalTime:T(10,40), open:true,
+         label:'약수 모두 쓰기', desc:'1과 자기 자신도 약수 — 짝을 지어 빠짐없이', theme:BTHEME },
+  B10: { group:'b-fm',  engine:'num', type:'b-multiples', chalQ:10, chalTime:T(10,30), open:true,
+         label:'배수와 공배수', desc:'배수 쓰기 · 공배수 · 최소공배수', theme:BTHEME }
+};
 
 const LEVEL_CONFIGS = {
   L1:  { group:'concept', engine:'choice', type:'pic-frac',   chalQ:20, chalTime:T(20,12),
@@ -163,6 +235,14 @@ const LEVEL_CONFIGS = {
          label:'대분수 × 대분수 계산하기', desc:'4지선다로 빠르게 풀기 — 자연수끼리 · 분수끼리 곱하면 안 돼요',
          theme:{bg:'bg-purple-50', border:'border-purple-300', hbg:'hover:bg-purple-100', lbl:'text-purple-900', descCls:'text-purple-700'} }
 };
+Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS);
+
+/** 계산 연습장(js/scratch.js)을 붙이는 레벨 — 중간 계산을 종이에 적어야 하는데 화면이 대신 보여 주지 않는 레벨.
+ *  선생님 승인 2026-11-17: '필요' 20개. 단계 풀이(과정형)는 풀이판이 중간값을 채워 주므로 넣지 않았다.
+ *  B5(구구 나눗셈)·그림·자리 옮기기·동분모처럼 암산으로 되는 레벨도 뺐다. */
+const SCRATCH_LEVELS = ['B1', 'B2', 'B3', 'B4', 'B6', 'B7', 'B8', 'B9', 'B10',
+                        'L9', 'L10', 'L12', 'L14', 'L16', 'L18', 'L21', 'L22', 'L27', 'L32', 'L36'];
+SCRATCH_LEVELS.forEach(lv => { LEVEL_CONFIGS[lv].scratch = true; });
 
 /* ═══ 잠금 ═══
  * 다음 레벨의 '도전 연습'은 이전 레벨을 '통과'해야 열린다.
@@ -227,14 +307,16 @@ function computeProgress(rows, scoreOf) {
 }
 
 function isLevelUnlocked(level, passed) {
-  const idx = LEVEL_ORDER.indexOf(level);
-  if (idx <= 0) return true;                       // L1은 항상 열림
-  return !!(passed && passed[LEVEL_ORDER[idx - 1]]);
+  const cfg = LEVEL_CONFIGS[level];
+  if (cfg && cfg.open) return true;                // 기초 트랙은 항상 열림
+  const prev = prevInTrack(level);
+  if (!prev) return true;                          // 트랙의 첫 레벨(L1)은 항상 열림
+  return !!(passed && passed[prev]);
 }
 function getPrevLevelInfo(level, progress) {
-  const idx = LEVEL_ORDER.indexOf(level);
-  if (idx <= 0) return null;
-  const prev = LEVEL_ORDER[idx - 1];
+  if (LEVEL_CONFIGS[level] && LEVEL_CONFIGS[level].open) return null;
+  const prev = prevInTrack(level);
+  if (!prev) return null;
   const w = passWindow(prev);
   return { level: prev, size: w.size, need: w.need, correct: windowCorrect(progress && progress.recent && progress.recent[prev]) };
 }
@@ -290,10 +372,64 @@ function buildScoreOutcome(d) {
   return { displayScore: s, recordedScore: s, scoreRecorded: true, message: '점수가 기록되었습니다.' };
 }
 
+/* ═══ 기초 트랙 시작점 (교사 화면 설정 → 반 문서 classes/{code}.basicStart) ═══
+ * 한 줄에 한 학생: '번호 뺄셈 곱셈 나눗셈 묶음'  예) 3 B1 B2 B6 가
+ *   뺄셈 B1 · 곱셈 B2~B4 · 나눗셈 B5~B8 중 시작할 레벨, 그 줄을 이미 통과했으면 '-' (또는 '통과')
+ *   묶음(가·나·다·라)은 '오늘 할 것' 순서를 정한다 — 가: B3 통과 전까지 기초만 · 나: 기초 먼저 · 다·라(또는 없음): 분수 먼저
+ *   '#' 뒤는 메모로 무시한다. 학생 이름은 쓰지 않는다(번호만).
+ */
+const START_LINES = ['sub', 'mul', 'div'];
+function parseBasicStart(text) {
+  const map = {}, errors = [];
+  String(text || '').split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.replace(/#.*/, '').trim();
+    if (!line) return;
+    const t = line.split(/[\s,]+/);
+    const no = t[0];
+    if (!/^\d{1,3}$/.test(no)) { errors.push(`${i + 1}째 줄: 번호가 숫자가 아니에요`); return; }
+    if (t.length < 4) { errors.push(`${i + 1}째 줄: 뺄셈·곱셈·나눗셈 시작점 3개가 필요해요`); return; }
+    const e = {};
+    for (let k = 0; k < 3; k++) {
+      const v = t[k + 1].toUpperCase().replace('통과', '-');
+      const line = START_LINES[k];
+      if (v !== '-' && BASIC_LINES[line].indexOf(v) === -1) {
+        errors.push(`${i + 1}째 줄: '${t[k + 1]}' 는 ${['뺄셈(B1)', '곱셈(B2~B4)', '나눗셈(B5~B8)'][k]} 레벨이 아니에요`); return;
+      }
+      e[line] = v;
+    }
+    if (t[4]) {
+      if (['가', '나', '다', '라'].indexOf(t[4]) === -1) { errors.push(`${i + 1}째 줄: 묶음은 가·나·다·라 중 하나예요`); return; }
+      e.g = t[4];
+    }
+    map[String(Number(no))] = e;
+  });
+  return { map, errors };
+}
+/** 시작점 앞이거나 '-'(통과)로 정한 줄의 레벨인가. start = basicStart[번호] (없으면 false) */
+function basicSkipped(start, lv) {
+  if (!start) return false;
+  const line = Object.keys(BASIC_LINES).find(k => BASIC_LINES[k].indexOf(lv) !== -1);
+  if (!line || line === 'fm') return false;
+  const st = start[line];
+  if (st === '-') return true;
+  const list = BASIC_LINES[line];
+  return list.indexOf(st) > list.indexOf(lv);
+}
+/** 기초 트랙에서 다음에 할 레벨 — 시작점이 있을 때만. 뺄셈 → 곱셈 → 나눗셈 → 약수와 배수 순 */
+function nextBasicLevel(start, passed) {
+  if (!start) return null;
+  return BASIC_ORDER.find(lv => !(passed && passed[lv]) && !basicSkipped(start, lv)) || null;
+}
+function formatBasicStart(map) {
+  return Object.keys(map || {}).sort((a, b) => Number(a) - Number(b))
+    .map(no => { const e = map[no]; return [no, e.sub, e.mul, e.div, e.g || ''].join(' ').trim(); }).join('\n');
+}
+
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
+  trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass

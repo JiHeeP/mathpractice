@@ -97,7 +97,7 @@ function createClass() {
 
 /* ═══ 반 화면 ═══ */
 function openClass(c) {
-  currentClass = Object.assign({ offDays: [] }, c);
+  currentClass = Object.assign({ offDays: [], basicStart: {} }, c);
   compareAuto = true;
   $('compareDate1').value = ''; $('compareDate2').value = '';
   App.only('teacherClass');
@@ -122,12 +122,13 @@ function copyLink() {
 
 function switchTab(tab) {
   currentTab = tab;
-  ['comparison','ranking','settings'].forEach(t => {
+  ['comparison','basic','ranking','settings'].forEach(t => {
     $(`tpanel-${t}`).classList.toggle('hidden', t !== tab);
     $(`ttab-${t}`).classList.toggle('ttab-on', t === tab);
   });
-  if (tab === 'settings') { loadStudents(); renderOffDays(); }
+  if (tab === 'settings') { loadStudents(); renderOffDays(); renderBasicStart(); }
   if (tab === 'ranking') loadRanking();
+  if (tab === 'basic') loadBasic();
   if (tab === 'comparison') { initCompareDates(); loadComparison(); }
 }
 
@@ -277,6 +278,70 @@ function updateCompareHeaders() {
   hint.innerHTML = parts.join('');
 }
 
+/* ── 기초 연산 통과 현황 (번호 × B1~B10). 기초 기록만 읽는다(DB.getBasicProgress) ── */
+function loadBasic(force) {
+  const L = Levels, code = currentClass.code;
+  const lineName = { sub: '뺄셈', mul: '곱셈', div: '나눗셈', fm: '약수·배수' };
+  $('tBasicHead').innerHTML = `<tr class="bg-slate-200 text-xs text-slate-800">
+      <th rowspan="2" class="px-2 py-2 sticky left-0 bg-slate-200">번호</th><th rowspan="2" class="px-2 py-2">묶음</th>
+      ${Object.keys(L.BASIC_LINES).map(k => `<th colspan="${L.BASIC_LINES[k].length}" class="px-2 py-1 border-l border-slate-300">${lineName[k]}</th>`).join('')}
+      <th rowspan="2" class="px-2 py-2 border-l border-slate-300">통과</th></tr>
+    <tr class="bg-slate-100 text-xs text-slate-600">${L.BASIC_ORDER.map(lv =>
+      `<th class="px-1 py-1 ${L.BASIC_LINES[Object.keys(L.BASIC_LINES).find(k => L.BASIC_LINES[k][0] === lv)] ? 'border-l border-slate-300' : ''}" title="${L.LEVEL_CONFIGS[lv].label}">${lv}</th>`).join('')}</tr>`;
+  const tb = $('tBasicBody');
+  tb.innerHTML = `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>`;
+  Promise.all([DB.getBasicProgress(code, force), DB.getStudents(code)]).then(([prog, students]) => {
+    const starts = currentClass.basicStart || {};
+    const nos = [...new Set([...students.map(s => String(s.number)), ...Object.keys(starts), ...Object.keys(prog)])]
+      .sort((a, b) => Number(a) - Number(b));
+    const lineStart = lv => Object.keys(L.BASIC_LINES).some(k => L.BASIC_LINES[k][0] === lv);
+    let anyPass = 0;
+    tb.innerHTML = nos.map(no => {
+      const p = prog[no] || { passed: {}, recent: {}, solved: {} };
+      const st = starts[no] || null;
+      const now = L.nextBasicLevel(st, p.passed);
+      const nPass = L.BASIC_ORDER.filter(lv => p.passed[lv]).length;
+      if (nPass) anyPass++;
+      const cells = L.BASIC_ORDER.map(lv => {
+        const edge = lineStart(lv) ? ' border-l border-slate-200' : '';
+        const nowCls = lv === now ? ' bb-now' : '';
+        let txt = '', cls = '';
+        if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
+        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.passWindow(lv).size}`; cls = 'bb-try'; }
+        else if (L.basicSkipped(st, lv)) { txt = '⤼'; cls = 'bb-skip'; }
+        const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
+        return `<td class="bb-cell ${cls}${nowCls}${edge}"${tip}>${txt}</td>`;
+      }).join('');
+      return `<tr class="border-b border-slate-100"><td class="px-2 py-2 text-center font-black sticky left-0 bg-white">${no}</td>
+        <td class="px-2 py-2 text-center font-bold text-slate-500">${st && st.g ? st.g : (st ? '·' : '<span class="text-slate-300">-</span>')}</td>${cells}
+        <td class="px-2 py-2 text-center font-bold border-l border-slate-200">${nPass}/${L.BASIC_ORDER.length}</td></tr>`;
+    }).join('') || `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-gray-500">학생이 없습니다.</td></tr>`;
+    const noStart = nos.filter(no => !starts[no]).length;
+    $('tBasicSummary').textContent = `기초 레벨을 하나라도 통과한 학생 ${anyPass}명` + (noStart ? ` · 시작점이 없는 번호 ${noStart}개(오늘 할 것에 기초가 안 나옴)` : '');
+  }).catch(e => { tb.innerHTML = `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-red-500">불러오지 못했습니다: ${e.message || e}</td></tr>`; });
+}
+
+/* ── 기초 연산 시작점 (반 설정, Firestore classes/{code}.basicStart — 형식은 levels.js parseBasicStart) ── */
+function renderBasicStart() {
+  const map = (currentClass && currentClass.basicStart) || {};
+  const n = Object.keys(map).length;
+  $('basicStartCount').textContent = n ? `· ${n}명` : '';
+  if (document.activeElement !== $('basicStartText')) $('basicStartText').value = Levels.formatBasicStart(map);
+}
+function saveBasicStart() {
+  const msg = $('basicStartMessage');
+  const { map, errors } = Levels.parseBasicStart($('basicStartText').value);
+  if (errors.length) { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = errors[0] + (errors.length > 1 ? ` 외 ${errors.length - 1}건` : ''); return; }
+  msg.className = 'text-sm font-bold text-gray-500'; msg.textContent = '저장 중...';
+  DB.setBasicStart(currentClass.code, map).then(m => {
+    currentClass.basicStart = m;
+    msg.className = 'text-sm font-bold text-emerald-600'; msg.textContent = `저장했습니다 (${Object.keys(m).length}명)`;
+    setTimeout(() => msg.textContent = '', 3000);
+    renderBasicStart();
+    if (currentTab === 'basic') loadBasic();
+  }).catch(e => { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = '저장 실패: ' + (e.message || ''); });
+}
+
 /* ── 등교 안 하는 날 (반 설정, Firestore classes/{code}.offDays) ── */
 function renderOffDays() {
   const list = offDays();
@@ -375,6 +440,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, printCards
 };
 })();
