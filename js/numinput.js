@@ -60,13 +60,16 @@ function paint() {
 function press(k) {
   if (waiting) return;
   const f = prob.fields[cur];
+  const fbEl = document.getElementById('numFb');
+  if (fbEl && fbEl.querySelector('.text-amber-600')) fbEl.innerHTML = '';   // 안내는 다시 누르면 지운다
   if (k === 'go' || k === 'ok') {
     if (isLast()) return submit();
     const empty = vals.findIndex((v, i) => i > cur && v.trim() === '');
     cur = empty !== -1 ? empty : vals.findIndex(v => v.trim() === '');
     return paint();
   }
-  if (k === 'del' || k === '⌫') vals[cur] = /, $/.test(vals[cur]) ? vals[cur].slice(0, -2) : vals[cur].slice(0, -1);
+  if (k === 'clear') vals[cur] = '';
+  else if (k === 'del' || k === '⌫') vals[cur] = /, $/.test(vals[cur]) ? vals[cur].slice(0, -2) : vals[cur].slice(0, -1);
   else if (k === ',') { if (f.list && vals[cur] && !/, $/.test(vals[cur])) vals[cur] += ', '; }
   else if (/^\d$/.test(k)) {
     const tail = vals[cur].split(',').pop().trim();
@@ -88,6 +91,11 @@ function submit() {
   // 빈 칸이 있으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)
   const empty = vals.findIndex(v => v.trim() === '');
   if (empty !== -1) { cur = empty; paint(); return; }
+  // 같은 수를 두 번 쓴 것은 입력 실수 — 채점하지 않고 알려 준다(어느 수인지는 학생이 찾는다)
+  if (prob.fields.some((f, i) => f.list && new Set(nums(vals[i])).size !== nums(vals[i]).length)) {
+    document.getElementById('numFb').innerHTML = '<span class="text-amber-600 text-base">같은 수를 두 번 썼어요. 하나를 지워 주세요.</span>';
+    return;
+  }
   waiting = true;
   const results = prob.fields.map((f, i) => fieldOK(f, vals[i]));
   const ok = results.every(Boolean);
@@ -112,7 +120,7 @@ function submit() {
 document.addEventListener('keydown', e => {
   if (!prob || !document.getElementById('numBody')) return;
   if (/^\d$/.test(e.key)) press(e.key);
-  else if (e.key === ',' ) press(',');
+  else if (e.key === ',' || e.key === ' ') { e.preventDefault(); press(','); }   // 스페이스도 쉼표로
   else if (e.key === 'Backspace') { e.preventDefault(); press('⌫'); }
   else if (e.key === 'Enter') { e.preventDefault(); press('go'); }
   else if (e.key === 'Tab' && prob.fields.length > 1 && !waiting) { e.preventDefault(); cur = (cur + 1) % prob.fields.length; paint(); }

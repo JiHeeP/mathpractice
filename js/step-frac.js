@@ -428,7 +428,8 @@ function padKey(k) {
   if (k === 'go') return goNext();
   const el = document.getElementById(curId);
   if (!el) return;
-  if (k === 'del') el.value = el.value.slice(0, -1);
+  if (k === 'clear') el.value = '';
+  else if (k === 'del') el.value = el.value.slice(0, -1);
   else if (el.value === '0') el.value = k;              // 0 으로 시작하는 수(05)는 만들지 않는다
   else if (el.value.length < 4) el.value += k;
   paintGo();

@@ -19,11 +19,22 @@ const NumPad = (() => {
       : `<button type="button" class="np-key" data-k="${k}">${k}</button>`).join('')}</div>`;
   }
 
-  /** root 안의 숫자판 단추에 onKey(k) 를 연결한다. k = '0'~'9' | 'del' | 'go' */
+  /** root 안의 숫자판 단추에 onKey(k) 를 연결한다. k = '0'~'9' | 'del' | 'clear'(지우기 길게) | 'go' | extra */
+  const HOLD_MS = 550;   // 지우기를 이만큼 누르고 있으면 그 칸을 통째로 지운다 ('clear')
+
   function bind(root, onKey) {
     root.querySelectorAll('.np-key').forEach(b => {
-      b.addEventListener('pointerdown', e => e.preventDefault());   // 칸의 포커스를 뺏지 않게
-      b.addEventListener('click', () => onKey(b.dataset.k));
+      let timer = null, held = false;
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault();                                        // 칸의 포커스를 뺏지 않게
+        if (b.dataset.k !== 'del') return;
+        held = false;
+        timer = setTimeout(() => { held = true; onKey('clear'); }, HOLD_MS);
+      });
+      const stop = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      ['pointerup', 'pointercancel'].forEach(t => b.addEventListener(t, stop));
+      b.addEventListener('click', () => { if (held) { held = false; return; } onKey(b.dataset.k); });
+      b.addEventListener('contextmenu', e => e.preventDefault());  // 길게 누를 때 메뉴가 뜨지 않게
     });
   }
 
