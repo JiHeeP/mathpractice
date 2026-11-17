@@ -1,7 +1,7 @@
 /* test-basic-track.js — 기초 연산 트랙 점검 (node tools/test-basic-track.js)
  * 브라우저 없이 levels.js · generator.js 만 돌려 본다.
  *   - 트랙 분리 뒤에도 분수·소수 트랙의 잠금이 예전과 같은가
- *   - 기초 레벨은 항상 열려 있는가, 건너뛰기 시험 판정
+ *   - 기초 레벨은 항상 열려 있는가
  *   - B1~B10 문제가 조건에 맞게 나오는가 (레벨마다 2,000문제)
  *   - 시작점 입력 해석
  */
@@ -45,13 +45,8 @@ console.log('통과 판정');
 let ts = 0;
 const row = (level, mode, seq) => ({ level, mode, seq, ts: ++ts, totalQuestions: seq.length, score: null });
 const prog = rows => L.computeProgress(rows, () => null);
-check('건너뛰기 시험 5문제 다 맞힘 → 통과', !!prog([row('B3', 'skiptest', '11111')]).passed.B3);
-check('4문제 맞히고 1개 틀림 → 통과 아님', !prog([row('B3', 'skiptest', '11110')]).passed.B3);
-check('건너뛰기 시험은 최근 문제 창에 안 들어감', !prog([row('B3', 'skiptest', '11111')]).recent.B3);
-check('분수 레벨의 skiptest 기록은 무시', !prog([row('L3', 'skiptest', '11111')]).passed.L3);
 check('기초 레벨 도전: 최근 20문제 중 18개면 통과', !!prog([row('B1', 'aborted', '0111111111'), row('B1', 'challenge', '1111111101')]).passed.B1);
 check('B4(10문제) 창 = 최근 10문제 중 9개', L.passWindow('B4').size === 10 && L.passWindow('B4').need === 9);
-check('건너뛰기 시험은 점수 없음', L.calculateScore({ mode: 'skiptest', level: 'B1', incorrect: 0 }) === null);
 
 console.log('문제 만들기 (레벨마다 2,000문제)');
 const N = 2000;

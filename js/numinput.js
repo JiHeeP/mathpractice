@@ -147,8 +147,8 @@ function submit() {
   const done = Session.problemDone(ok);
   setTimeout(() => {
     if (!done) return next();
-    document.getElementById('numBody').innerHTML = Session.isSkipTest() ? Session.skipFinishHTML() : Session.finishHTML();
-    Session.saveResult();   // 건너뛰기 시험도 기록은 남긴다(점수 없음). 통과 판정은 levels.js computeProgress
+    document.getElementById('numBody').innerHTML = Session.finishHTML();
+    Session.saveResult();
   }, ok ? 700 : 2200);
 }
 

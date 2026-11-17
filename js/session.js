@@ -21,23 +21,15 @@ function start(level, mode, cfg, engine, onExit) {
   guardNavigation();
   S.startAt = Date.now();
   if (mode === 'challenge') { S.total = cfg.chalQ; S.timeLimit = cfg.chalTime; }
-  else if (mode === 'skiptest') { S.total = Levels.SKIP_TEST_Q; S.timeLimit = 0; }
   else { S.total = 0; S.timeLimit = 0; }
 }
 
 const isChallenge = () => S.mode === 'challenge';
-/** 기초 레벨의 '5문제 다 맞으면 건너뛰기' — 시간 제한·점수 없음, 하나라도 틀리면 바로 끝 */
-const isSkipTest = () => S.mode === 'skiptest';
 const elapsed = () => Math.floor((Date.now() - S.startAt) / 1000);
 
 /** 화면 상단 — 진행 막대(몇 번째 문제) · 시간 막대 · 그만하기(✕). 글자 대신 막대로 보여 준다 */
 function headerHTML() {
   const x = '<button class="sx-x" onclick="Session.exit()" title="그만하기" aria-label="그만하기">✕</button>';
-  if (isSkipTest()) {
-    return `<div class="sx-top"><span class="sx-num" id="sessSolved">${S.solved} / ${S.total}</span>
-      <div class="sx-bar"><b id="sessProg" style="width:${pct(S.solved, S.total)}%"></b></div>${x}</div>
-      <div class="mb-3 text-center text-sm font-black text-slate-600">⏭ 건너뛰기 시험 — ${S.total}문제를 다 맞히면 통과</div>`;
-  }
   if (!isChallenge()) {
     return `<div class="sx-top"><span class="sx-num" id="sessSolved">${S.solved}문제</span>
       <span class="sx-free">🌱 연습 · 점수 없음</span><span class="flex-1"></span>${x}</div>`;
@@ -74,7 +66,7 @@ function updateWindow() {
 
 function updateSolved() {
   const el = document.getElementById('sessSolved');
-  if (el) el.textContent = (isChallenge() || isSkipTest()) ? `${S.solved} / ${S.total}` : `${S.solved}문제`;
+  if (el) el.textContent = isChallenge() ? `${S.solved} / ${S.total}` : `${S.solved}문제`;
   const bar = document.getElementById('sessProg');
   if (bar) bar.style.width = pct(S.solved, S.total) + '%';
 }
@@ -128,11 +120,9 @@ function problemDone(ok) {
     if (!S.wasPassed && !S.justPassed && Levels.windowPassed(S.level, S.recent)) S.justPassed = true;
     updateWindow();
   }
-  if (isSkipTest()) S.seq += ok ? '1' : '0';
   updateSolved();
   if (isChallenge() && S.justPassed && !S.wasPassed && S.solved < S.total) S.passedEarly = true;
-  const done = (isChallenge() && (S.solved >= S.total || S.passedEarly))
-            || (isSkipTest() && (!ok || S.solved >= S.total));
+  const done = isChallenge() && (S.solved >= S.total || S.passedEarly);
   // 풀던 중 탭이 닫히거나 새로고침돼도 여기까지 푼 기록이 남도록 기기에 적어 둔다 (끝나면 saveResult/exit 가 지운다)
   if (!done && !S.saved) DB.saveDraft(App.classCode, buildPayload());
   return done;
@@ -168,34 +158,11 @@ function finishHTML() {
   </div>`;
 }
 
-/** 건너뛰기 시험 결과 화면 */
-function skipFinishHTML() {
-  const ok = S.seq === '1'.repeat(S.total);
-  const next = App.levelAfter(S.level);
-  const buttons = ok
-    ? (next ? `<button onclick="Session.exit('next')" class="big-btn big-go">${next}로 가기 👉</button>` : '')
-    : `<button onclick="Session.exit('challenge')" class="big-btn big-go">🔥 ${S.level} 도전하기</button>`;
-  return `<div class="bg-white p-6 rounded-2xl border border-gray-200 text-center">
-    ${ok ? `<div class="res-big text-green-600">${S.level} 통과! ⏭</div><div class="mb-4 text-sm font-bold text-gray-500">이 레벨은 건너뛰어도 돼요</div>`
-         : `<div class="res-big text-indigo-600">이 레벨부터 연습해요</div><div class="mb-4 text-sm font-bold text-gray-500">${S.correct}문제 맞히고 하나 틀렸어요</div>`}
-    <div class="flex flex-col gap-3">${buttons}
-      <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
-  </div>`;
-}
-
 /** 저장용 payload (점수는 db.js 에서 계산) */
 function buildPayload() {
   const dur = elapsed();
   const over = isChallenge() && (S.overtime || dur > S.timeLimit);
-  const seq = (isChallenge() || isSkipTest()) && S.seq ? { seq: S.seq } : {};
-  if (isSkipTest()) {
-    return Object.assign(seq, {
-      studentNo: App.studentNo, level: S.level, mode: 'skiptest',
-      totalQuestions: S.solved, correct: S.correct, incorrect: S.incorrect,
-      accuracyPct: S.solved ? Math.round((S.correct / S.solved) * 100) : 0,
-      durationSec: dur, timeLimit: 0, isOvertime: false, resultStatus: 'skiptest'
-    });
-  }
+  const seq = isChallenge() && S.seq ? { seq: S.seq } : {};
   return Object.assign(seq, {
     studentNo: App.studentNo,
     level: S.level,
@@ -264,11 +231,11 @@ window.addEventListener('beforeunload', e => {
 });
 
 function exit(after) {
-  if (typeof after !== 'string') after = undefined;   // 'again' | 'next' | 'challenge' | 없음
+  if (typeof after !== 'string') after = undefined;   // 'again' | 'next' | 없음
   stopTimer();
   // '한 번 더'는 곧바로 새 도전을 시작하므로 쌓아 둔 칸을 그대로 넘겨준다.
   // (history.back() 은 비동기라, 치우고 바로 새 칸을 쌓으면 뒤늦은 '뒤로'가 새 도전을 끝내 버린다)
-  if (guarded && !leavingByBack && after !== 'again' && after !== 'challenge') {   // '그만하기'·'목록으로'로 나갈 때는 쌓아 둔 칸을 치운다
+  if (guarded && !leavingByBack && after !== 'again') {   // '그만하기'·'목록으로'로 나갈 때는 쌓아 둔 칸을 치운다
     guarded = false;
     try { history.back(); } catch (e) {}
   }
@@ -282,7 +249,7 @@ function exit(after) {
 }
 
 window.Session = {
-  state: S, start, isChallenge, isSkipTest, skipFinishHTML, elapsed,
+  state: S, start, isChallenge, elapsed,
   headerHTML, updateSolved, startTimer, stopTimer, penalize,
   problemDone, finishHTML, saveResult, exit, windowHTML
 };

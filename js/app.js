@@ -370,13 +370,6 @@ function selectLevel(lv) {
     btn.className = 'big-btn big-lock';
     btn.innerHTML = `🔒 ${prev.level} 먼저 통과해요<small>${prev.level} 도전 최근 ${prev.size}문제 중 ${prev.need}개 · 지금 ${prev.correct}개</small>`;
   }
-  // 기초 레벨: 아직 통과하지 않았으면 '5문제 다 맞으면 건너뛰기'
-  const skip = $('skipTestBtn');
-  if (cfg.open && !passed) {
-    skip.classList.remove('hidden');
-    skip.textContent = `⏭ ${L.SKIP_TEST_Q}문제 다 맞으면 건너뛰기`;
-    skip.onclick = () => startPractice('skiptest');
-  } else { skip.classList.add('hidden'); skip.onclick = null; }
   only('modeSelection');
 }
 
@@ -409,13 +402,13 @@ function startPractice(mode) {
   else                           StepFrac.init(state.level, mode, cfg, back);
 }
 
-/** 연습이 끝나고 돌아올 때. after = 'again'(한 번 더) | 'challenge'(건너뛰기 시험 뒤 그 레벨 도전) | 'next'(다음 레벨 카드) | 없음(목록) */
+/** 연습이 끝나고 돌아올 때. after = 'again'(한 번 더) | 'next'(다음 레벨 카드) | 없음(목록) */
 function backToLevels(after) {
   // 방금 저장한 기록은 db.js 가 캐시에 덧붙여 두므로 캐시를 비우지 않는다 (비우면 기록을 전부 다시 읽음)
   const lv = state.level;
   fetchBestScores().then(() => {
     renderLevelButtons();
-    if ((after === 'again' || after === 'challenge') && lv) { state.level = lv; startPractice('challenge'); }
+    if (after === 'again' && lv) { state.level = lv; startPractice('challenge'); }
     else if (after === 'next' && levelAfter(lv)) selectLevel(levelAfter(lv));
     else only('levelSelection');
   });

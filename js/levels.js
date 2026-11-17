@@ -60,12 +60,8 @@ const LEVEL_MAX = Object.freeze({
   'B1': 100, 'B2': 100, 'B3': 100, 'B4': 100, 'B5': 100, 'B6': 100, 'B7': 100, 'B8': 100, 'B9': 100, 'B10': 100
 });
 
-/** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우,
- *  'skiptest' 는 기초 레벨의 '5문제 다 맞으면 건너뛰기' */
-const PRACTICE_MODES = ['free', 'step_free', 'free_choice', 'aborted', 'skiptest'];
-
-/** 건너뛰기 시험 — 이 개수를 연달아 다 맞히면 그 레벨을 통과한 것으로 친다 (기초 트랙만) */
-const SKIP_TEST_Q = 5;
+/** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
+const PRACTICE_MODES = ['free', 'step_free', 'free_choice', 'aborted'];
 
 const GROUP_LABELS = {
   concept: '🎨 개념 이해',
@@ -279,11 +275,6 @@ function computeProgress(rows, scoreOf) {
   (rows || []).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0)).forEach(r => {
     const lv = r && r.level;
     if (!LEVEL_CONFIGS[lv]) return;
-    // 건너뛰기 시험: 기초 레벨에서 5문제를 다 맞히면 통과. 최근 문제 창에는 넣지 않는다
-    if (r.mode === 'skiptest') {
-      if (LEVEL_CONFIGS[lv].open && r.seq === '1'.repeat(SKIP_TEST_Q)) passed[lv] = true;
-      return;
-    }
     if (r.mode !== 'challenge' && r.mode !== 'aborted') return;
     seen[lv] = true;
     if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
@@ -415,7 +406,7 @@ function formatBasicStart(map) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SKIP_TEST_Q,
+  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS,
   trackOf, prevInTrack, nextInTrack, parseBasicStart, formatBasicStart, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
