@@ -370,7 +370,11 @@ function render() {
     </div>`;
 }
 
-/* ═══ 입력 위젯 ═══ */
+/* ═══ 입력 위젯 ═══
+ * 칸은 <input> 이지만 inputmode="none" 이라 기기 자판이 뜨지 않는다. 화면 숫자판(js/numpad.js)으로 채우고,
+ * 크롬북처럼 키보드가 있으면 그대로 쳐도 된다. 칸을 누르면 그 칸이 선택된다. */
+let order = [], curId = null;
+
 function inputHTML(type) {
   if (type === 'yn') {
     return `<div class="flex justify-center gap-4">
@@ -378,49 +382,73 @@ function inputHTML(type) {
       <button class="yn-btn yn-no" onclick="StepFrac.answerYN(false)">❌ 아니오</button>
     </div>`;
   }
-  const box = (id, ph) => `<input type="text" inputmode="numeric" id="${id}" placeholder="${ph}" class="fi-box" autocomplete="off"/>`;
+  const box = (id, ph) => `<input type="text" inputmode="none" id="${id}" placeholder="${ph}" class="fi-box" autocomplete="off"/>`;
+  let row;
   if (type === 'row') {
     const f = steps[idx].f;
-    const mini = id => `<input type="text" inputmode="numeric" id="${id}" class="fi-box fi-mini" autocomplete="off"/>`;
-    return `<div class="flex flex-wrap justify-center gap-3 items-center">
-      <div class="ws-row">
+    const mini = id => `<input type="text" inputmode="none" id="${id}" class="fi-box fi-mini" autocomplete="off"/>`;
+    row = `<div class="ws-row">
         ${fracHTML(f)}<span class="q-op">=</span>
         <span class="fr"><span class="fr-n">${f.n}<span class="q-op">×</span>${mini('fiA')}</span><span class="fr-d">${f.d}<span class="q-op">×</span>${mini('fiB')}</span></span>
         <span class="q-op">=</span>
         <div class="fi-frac">${box('fiN', '')}<div class="fi-bar"></div>${box('fiD', '')}</div>
-      </div>
-      <button onclick="StepFrac.submit()" class="btn-check">확인</button>
-    </div>`;
-  }
-  if (type === 'num') {
-    return `<div class="flex justify-center gap-3 items-center">
-      ${box('fiNum', '')}
-      <button onclick="StepFrac.submit()" class="btn-check">확인</button>
-    </div>`;
-  }
-  const whole = type === 'mixed' ? box('fiW', '정수') : '';
-  return `<div class="flex justify-center gap-3 items-center">
-    <div class="fi">${whole}
+      </div>`;
+  } else if (type === 'num') {
+    row = box('fiNum', '');
+  } else {
+    const whole = type === 'mixed' ? box('fiW', '정수') : '';
+    row = `<div class="fi">${whole}
       <div class="fi-frac">${box('fiN', '분자')}<div class="fi-bar"></div>${box('fiD', '분모')}</div>
-    </div>
-    <button onclick="StepFrac.submit()" class="btn-check">확인</button>
-  </div>`;
+    </div>`;
+  }
+  return `<div class="flex justify-center items-center">${row}</div>${NumPad.html()}`;
+}
+
+const valOf = id => ((document.getElementById(id) || {}).value || '').trim();
+
+/** 지금 칸 바꾸기 — 굵은 테두리로 표시하고, 남은 빈칸이 없으면 '다음 칸' 키를 '확인'으로 */
+function setCur(id, focus) {
+  curId = id;
+  order.forEach(k => { const el = document.getElementById(k); if (el) el.classList.toggle('fi-cur', k === id); });
+  if (focus) { const el = document.getElementById(id); if (el) el.focus({ preventScroll: true }); }
+  paintGo();
+}
+function paintGo() { NumPad.setGo(!order.some(k => k !== curId && !valOf(k))); }
+
+/** 다음 빈칸으로. 빈칸이 지금 칸뿐이거나 없으면 채점 */
+function goNext() {
+  const i = order.indexOf(curId);
+  const rest = order.slice(i + 1).concat(order.slice(0, i));
+  const empty = rest.find(k => !valOf(k));
+  if (empty) setCur(empty, true); else submit();
+}
+
+function padKey(k) {
+  if (waiting) return;
+  if (k === 'go') return goNext();
+  const el = document.getElementById(curId);
+  if (!el) return;
+  if (k === 'del') el.value = el.value.slice(0, -1);
+  else if (el.value === '0') el.value = k;              // 0 으로 시작하는 수(05)는 만들지 않는다
+  else if (el.value.length < 4) el.value += k;
+  paintGo();
 }
 
 function wireInputs(type) {
-  const order = type === 'num' ? ['fiNum'] : type === 'row' ? ['fiA','fiB','fiN','fiD'] : type === 'mixed' ? ['fiW','fiN','fiD'] : ['fiN','fiD'];
-  order.forEach((id, i) => {
+  order = type === 'num' ? ['fiNum'] : type === 'row' ? ['fiA','fiB','fiN','fiD'] : type === 'mixed' ? ['fiW','fiN','fiD'] : ['fiN','fiD'];
+  order.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
+    el.addEventListener('focus', () => { if (curId !== id) setCur(id); });
+    el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 4); paintGo(); });
     el.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
-      const nextEl = document.getElementById(order[i + 1]);
-      if (nextEl && !nextEl.value.trim()) nextEl.focus(); else submit();
+      goNext();
     });
   });
-  const first = document.getElementById(order[0]);
-  if (first) first.focus();
+  NumPad.bind(document.getElementById('stepQArea'), padKey);
+  setCur(order[0], true);
 }
 
 /* ═══ 스텝 표시 ═══ */
@@ -451,6 +479,7 @@ function showStep() {
   </div>`;
   startStepClock();
   if (s.type !== 'yn') wireInputs(s.type);
+  qa.scrollIntoView({ block: 'nearest' });           // 크롬북처럼 낮은 화면에서 입력칸·숫자판이 화면 밖에 있지 않게
 }
 
 /* ═══ 채점 ═══ */
@@ -504,7 +533,12 @@ function submit() {
   if (waiting) return;
   const s = steps[idx], fb = document.getElementById('stepFb');
   const got = readValue(s.type);
-  if (got === null) { fb.innerHTML = '<span class="text-gray-500 text-base">칸을 모두 채워 주세요.</span>'; return; }
+  if (got === null) {
+    fb.innerHTML = '<span class="text-gray-500 text-base">칸을 모두 채워 주세요.</span>';
+    const empty = order.find(k => !valOf(k));
+    if (empty) setCur(empty, true);                   // 빈칸으로 옮겨 준다
+    return;
+  }
   const r = judge(s.type, got, s.exp);
   finishStep(r.ok, fb, s, r.note);
 }
