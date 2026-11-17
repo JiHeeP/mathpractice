@@ -8,14 +8,18 @@
  *     빈 칸에서 '확인'. 빈 칸에서 지우기를 누르면 그 칸이 없어지고 앞 칸으로 간다
  *   - 배수·공배수(list): 문제에 나온 개수만큼 칸을 미리 보여 준다(개수는 문제에 이미 있다)
  *   - 한 자리 답(auto, B5): 숫자 하나를 누르면 바로 채점한다(확인 키 없음)
+ *   - 세로셈(vert, B1~B4): 문제를 세로로 쓰고, 답은 자릿수 칸에 일의 자리부터 왼쪽으로 채운다
+ *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄(채점하지 않음, 맨 아래 답만 채점)
  * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
  */
 const NumInput = (() => {
-let level, cfg, prob, boxes, cur, waiting, marks;
+let level, cfg, prob, boxes, cur, waiting, marks, helpOn = false;
+/* 도움 칸이 있는 레벨 — 기본은 꺼 두고 학생이 켠다(선생님 결정 2026-11-17 B1). 켜 두면 그 판 동안 유지 */
+const HELP = { B4: '부분곱 칸', B9: '짝 찾기 칸' };
 
 function init(lv, mode, config, onExit) {
-  level = lv; cfg = config;
+  level = lv; cfg = config; helpOn = false;
   Session.start(lv, mode, config, 'num', onExit);
   const area = document.getElementById('practiceArea');
   area.classList.remove('hidden');
@@ -29,15 +33,23 @@ function init(lv, mode, config, onExit) {
   next();
 }
 
-/* 칸 목록 — { f: 몇 번째 field, v: 쓴 수(문자열) } */
+/* 칸 목록 — { f: 몇 번째 field, v: 쓴 수(문자열), k: 'n' 수 | 'd' 자릿수 한 칸 | 'opt' 도움 칸(채점 안 함) } */
 function makeBoxes() {
   const out = [];
   prob.fields.forEach((f, i) => {
-    const n = f.list && !f.grow ? f.ans.length : 1;
-    for (let k = 0; k < n; k++) out.push({ f: i, v: '' });
+    if (f.vert) {
+      if (helpOn && HELP[level]) for (let r = 0; r < 2; r++) out.push({ f: i, v: '', k: 'opt' });
+      for (let d = 0; d < String(f.ans).length; d++) out.push({ f: i, v: '', k: 'd' });
+      return;
+    }
+    const n = f.list && !f.grow ? f.ans.length : (f.grow && pairs() ? 2 : 1);
+    for (let k = 0; k < n; k++) out.push({ f: i, v: '', k: 'n' });
   });
   return out;
 }
+const pairs = () => helpOn && level === 'B9';             // 약수 짝 줄
+const firstCur = () => { const d = boxes.findIndex(x => x.k === 'opt'); if (d !== -1) return d;
+  const ds = boxes.map((x, b) => b).filter(b => boxes[b].k === 'd'); return ds.length ? ds[ds.length - 1] : 0; };
 const fieldOf = b => prob.fields[boxes[b].f];
 const isGrow = b => !!fieldOf(b).grow;
 const isQR = () => prob.fields.length === 2 && prob.fields[0].label === '몫';
@@ -46,22 +58,49 @@ const isAuto = () => prob.fields.length === 1 && !!prob.fields[0].auto;
 function next() {
   prob = Gen.generateNumProblem(level);
   boxes = makeBoxes();
-  cur = 0; waiting = false; marks = null;
+  cur = firstCur(); waiting = false; marks = null;
   Scratch.clear();
   document.getElementById('numBody').innerHTML = `
+    ${HELP[level] ? `<div class="text-center mb-2"><button type="button" id="numHelp" class="num-help">${helpOn ? '✓ ' : ''}${HELP[level]} ${helpOn ? '끄기' : '켜기'}</button></div>` : ''}
     <div id="numStage"></div>
     <div id="numFb" class="min-h-8 mt-2 text-center font-bold text-lg"></div>
     ${NumPad.html(isAuto() ? { noGo: true } : {})}`;
   NumPad.bind(document.getElementById('numBody'), press);
+  const hb = document.getElementById('numHelp');
+  if (hb) hb.onclick = toggleHelp;
+  paint();
+}
+
+/** 도움 칸 켜기/끄기 — 쓴 수는 남긴다(약수), 부분곱 칸은 새로 그린다 */
+function toggleHelp() {
+  if (waiting) return;
+  helpOn = !helpOn;
+  const keep = boxes.filter(x => x.k === 'n' && x.v).map(x => x.v);
+  const digits = boxes.filter(x => x.k === 'd').map(x => x.v);
+  boxes = makeBoxes();
+  if (level === 'B9') {
+    const f = boxes[0].f;
+    boxes = keep.map(v => ({ f, v, k: 'n' }));
+    if (!boxes.length || pairs()) boxes.push({ f, v: '', k: 'n' });
+    if (pairs() && boxes.length % 2) boxes.push({ f, v: '', k: 'n' });
+    cur = boxes.findIndex(x => !x.v);
+  } else {
+    boxes.filter(x => x.k === 'd').forEach((x, i) => { x.v = digits[i] || ''; });
+    cur = firstCur();
+  }
+  const hb = document.getElementById('numHelp');
+  if (hb) hb.textContent = `${helpOn ? '✓ ' : ''}${HELP[level]} ${helpOn ? '끄기' : '켜기'}`;
   paint();
 }
 
 function boxHTML(b) {
   const f = fieldOf(b), cls = ['num-field'];
   if (f.list) cls.push('num-item');
+  if (boxes[b].k === 'd') cls.push('num-digit');
+  if (boxes[b].k === 'opt') cls.push('num-opt');
   if (b === cur && !waiting) cls.push('on');
   if (marks) cls.push(marks[b]);
-  const lbl = f.label ? `<span class="num-lbl">${f.label}</span>` : '';
+  const lbl = f.label && boxes[b].k === 'n' ? `<span class="num-lbl">${f.label}</span>` : '';
   return `<button type="button" class="${cls.join(' ')}" data-b="${b}">${lbl}<span class="num-val">${boxes[b].v}</span></button>`;
 }
 
@@ -69,7 +108,25 @@ function paint() {
   const stage = document.getElementById('numStage');
   if (!stage) return;
   const shown = boxes.map((x, b) => b).filter(b => !(marks && isGrow(b) && !boxes[b].v));   // 채점 뒤에는 남은 빈 칸을 숨긴다
-  if (isQR()) {
+  const f0 = prob.fields[0];
+  if (f0.vert) {
+    const { a, op, b } = f0.vert;
+    const cells = n => String(n).split('').map(c => `<span class="vt-c">${c}</span>`).join('');   // 자릿수 칸과 같은 폭으로 줄 맞춤
+    const opts = shown.filter(x => boxes[x].k === 'opt'), ds = shown.filter(x => boxes[x].k === 'd');
+    const optRows = opts.map((x, r) => `<span></span><span class="vt-opt" style="padding-right:${r * 2.85}rem">${boxHTML(x)}</span>`).join('');
+    stage.innerHTML = `<div class="vt">
+      <span></span><span class="vt-num">${cells(a)}</span>
+      <span class="q-op">${op}</span><span class="vt-num">${cells(b)}</span>
+      <span class="vt-rule"></span>
+      ${optRows}${opts.length ? '<span class="vt-rule"></span>' : ''}
+      <span></span><span class="vt-ans">${ds.map(boxHTML).join('')}</span>
+    </div>`;
+  } else if (pairs()) {
+    const n = (prob.display.match(/\d+/) || [''])[0];
+    let rows = '';
+    for (let r = 0; r < shown.length; r += 2) rows += `<div class="num-pair">${boxHTML(shown[r])}<span class="q-op">×</span>${shown[r + 1] !== undefined ? boxHTML(shown[r + 1]) : ''}<span class="q-op">= ${n}</span></div>`;
+    stage.innerHTML = `<div class="text-center mb-3"><div class="quiz-q num-q">${prob.display}</div></div><div class="num-pairs">${rows}</div>`;
+  } else if (isQR()) {
     stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(0)}<span class="q-op">…</span>${boxHTML(1)}</div>`;
   } else {
     stage.innerHTML = `<div class="text-center mb-4"><div class="quiz-q num-q">${prob.display}</div></div>
@@ -81,7 +138,14 @@ function paint() {
 
 /** '다음 칸'을 누르면 갈 곳 — 칸 번호, 'new'(약수 칸 하나 더), null(남은 칸이 없으니 확인) */
 function target() {
-  const need = b => !isGrow(b) && !boxes[b].v;              // 꼭 채워야 하는 빈 칸
+  const need = b => !isGrow(b) && boxes[b].k !== 'opt' && !boxes[b].v;   // 꼭 채워야 하는 빈 칸
+  if (boxes[cur].k === 'opt') {                             // 도움 칸 → 다음 도움 칸 → 답의 일의 자리
+    if (boxes[cur + 1] && boxes[cur + 1].k === 'opt') return cur + 1;
+    for (let b = boxes.length - 1; b >= 0; b--) if (boxes[b].k === 'd' && !boxes[b].v) return b;
+  }
+  if (boxes[cur].k === 'd') {                               // 자릿수 칸은 왼쪽으로
+    for (let b = cur - 1; b >= 0 && boxes[b].k === 'd'; b--) if (!boxes[b].v) return b;
+  }
   for (let b = cur + 1; b < boxes.length; b++) if (need(b)) return b;
   if (isGrow(cur) && boxes[cur].v) {
     const f = boxes[cur].f;
@@ -100,13 +164,25 @@ function press(k) {
   if (k === 'go' || k === 'ok' || k === ',') {
     const t = target();
     if (t === null) return submit();
-    if (t === 'new') { boxes.splice(cur + 1, 0, { f: box.f, v: '' }); cur++; }
+    if (t === 'new') {
+      const add = pairs() ? 2 : 1, at = boxes.reduce((m, x, b) => x.f === box.f ? b : m, cur) + 1;
+      for (let i = 0; i < add; i++) boxes.splice(at, 0, { f: box.f, v: '', k: 'n' });
+      cur = at;
+    }
     else cur = t;
     return paint();
   }
-  if (k === 'clear') box.v = '';
+  if (box.k === 'd' && /^\d$/.test(k)) {                  // 자릿수 칸: 한 칸에 숫자 하나, 쓰면 왼쪽 칸으로
+    box.v = k;
+    if (boxes[cur - 1] && boxes[cur - 1].k === 'd') cur--;
+    return paint();
+  }
+  if (box.k === 'd' && (k === 'del' || k === '⌫') && !box.v && boxes[cur + 1] && boxes[cur + 1].k === 'd') {
+    cur++; boxes[cur].v = ''; return paint();               // 빈 자릿수 칸에서 지우기 = 오른쪽 칸을 지우고 그리로
+  }
+  if (k === 'clear') { if (box.k === 'd') boxes.forEach(x => { if (x.k === 'd') x.v = ''; }); else box.v = ''; if (box.k === 'd') cur = firstCur(); }
   else if (k === 'del' || k === '⌫') {
-    if (!box.v && isGrow(cur) && boxes.filter(x => x.f === box.f).length > 1) {   // 빈 약수 칸은 없애고 앞 칸으로
+    if (!box.v && isGrow(cur) && !pairs() && boxes.filter(x => x.f === box.f).length > 1) {   // 빈 약수 칸은 없애고 앞 칸으로
       boxes.splice(cur, 1); cur = Math.max(0, cur - 1);
     } else box.v = box.v.slice(0, -1);
   } else if (/^\d$/.test(k)) {
@@ -119,14 +195,19 @@ function press(k) {
 
 /** 칸마다 맞았나(ok/no). list 는 순서 상관없이 정답 목록에 있는 수면 ok */
 function judge() {
+  const ds = boxes.filter(x => x.k === 'd');
   return boxes.map(x => {
     const f = prob.fields[x.f];
-    if (!x.v) return '';
+    if (!x.v || x.k === 'opt') return '';
+    if (x.k === 'd') return String(f.ans)[ds.indexOf(x)] === x.v ? 'ok' : 'no';
     return (f.list ? f.ans.includes(Number(x.v)) : Number(x.v) === f.ans) ? 'ok' : 'no';
   });
 }
 function fieldOK(fi) {
-  const f = prob.fields[fi], got = boxes.filter(x => x.f === fi && x.v).map(x => Number(x.v));
+  const f = prob.fields[fi];
+  if (f.vert) return boxes.filter(x => x.k === 'd').map(x => x.v).join('') === String(f.ans);
+  let got = boxes.filter(x => x.f === fi && x.v && x.k === 'n').map(x => Number(x.v));
+  if (pairs()) got = [...new Set(got)];                      // 짝 줄은 6 × 6 처럼 같은 수가 두 번 나올 수 있다
   if (!f.list) return got.length === 1 && got[0] === f.ans;
   const want = f.ans.slice().sort((a, b) => a - b), g = got.slice().sort((a, b) => a - b);
   return g.length === want.length && g.every((x, i) => x === want[i]);
@@ -135,7 +216,7 @@ const ansText = f => f.list ? f.ans.join(', ') : String(f.ans);
 
 function submit() {
   // 꼭 채워야 할 칸이 비었으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)
-  const empty = boxes.findIndex((x, b) => !x.v && !isGrow(b));
+  const empty = boxes.findIndex((x, b) => !x.v && !isGrow(b) && x.k !== 'opt');
   if (empty !== -1) { cur = empty; paint(); return; }
   const fb = document.getElementById('numFb');
   if (prob.fields.some((f, i) => f.grow && !boxes.some(x => x.f === i && x.v))) {
@@ -143,7 +224,7 @@ function submit() {
     return;
   }
   // 같은 수를 두 번 쓴 것은 입력 실수 — 채점하지 않고 알려 준다(어느 수인지는 학생이 찾는다)
-  if (prob.fields.some((f, i) => { const v = boxes.filter(x => x.f === i && x.v).map(x => x.v); return f.list && new Set(v).size !== v.length; })) {
+  if (!pairs() && prob.fields.some((f, i) => { const v = boxes.filter(x => x.f === i && x.v).map(x => x.v); return f.list && new Set(v).size !== v.length; })) {
     fb.innerHTML = '<span class="text-amber-600 text-base">같은 수를 두 번 썼어요. 하나를 지워 주세요.</span>';
     return;
   }

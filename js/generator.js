@@ -749,22 +749,25 @@ const one = (display, ans) => ({ display, fields: [{ label: '', ans }] });
 const divQR = (a, b) => ({ display: opHTML(a, '÷', b),
   fields: [{ label: '몫', ans: Math.floor(a / b) }, { label: '나머지', ans: a % b }] });
 
+/** 세로셈으로 보여 줄 문제 — vert 가 있으면 numinput.js 가 세로로 쓰고, 답을 자릿수 칸에 일의 자리부터 채우게 한다 */
+const vertOne = (a, op, b, ans) => { const p = one(opHTML(a, op, b), ans); p.fields[0].vert = { a, op, b }; return p; };
+
 /** 받아내림이 한 번 이상 있는 세 자리 − 세 자리 (답은 양수) */
 function genSub3() {
   for (;;) {
     const a = randInt(200, 999), b = randInt(100, a - 1);
     const borrowOnes = (a % 10) < (b % 10);
     const borrowTens = (Math.floor(a / 10) % 10) - (borrowOnes ? 1 : 0) < (Math.floor(b / 10) % 10);
-    if ((borrowOnes || borrowTens) && a - b >= 10) return one(opHTML(a, '−', b), a - b);
+    if ((borrowOnes || borrowTens) && a - b >= 10) return vertOne(a, '−', b, a - b);
   }
 }
 function genMul1() {   // (두·세 자리) × (한 자리)
   const a = Math.random() < 0.5 ? randInt(12, 99) : randInt(102, 999), b = randInt(2, 9);
-  return one(opHTML(a, '×', b), a * b);
+  return vertOne(a, '×', b, a * b);
 }
 function nonRound(lo, hi) { for (;;) { const n = randInt(lo, hi); if (n % 10) return n; } }
-function genMul22() { const a = nonRound(12, 99), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
-function genMul32() { const a = nonRound(102, 999), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
+function genMul22() { const a = nonRound(12, 99), b = nonRound(12, 99); return vertOne(a, '×', b, a * b); }
+function genMul32() { const a = nonRound(102, 999), b = nonRound(12, 99); return vertOne(a, '×', b, a * b); }
 function genDiv99() {   // 몫은 늘 한 자리(2~9) — auto: 숫자 하나를 누르면 바로 채점(numinput.js)
   const b = randInt(2, 9), q = randInt(2, 9), p = one(opHTML(b * q, '÷', b), q);
   p.fields[0].auto = true;
