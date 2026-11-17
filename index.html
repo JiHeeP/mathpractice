@@ -214,6 +214,10 @@
 
   <!-- 랭킹 -->
   <div id="tpanel-ranking" class="hidden">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <p class="text-xs text-slate-500">학생 기기가 올린 요약으로 만든 랭킹입니다. 순위가 이상하면 오른쪽 버튼으로 전체 기록을 읽어 다시 계산하세요(읽기 수가 많아 자주 누르지 마세요).</p>
+      <button id="tRankingFullBtn" class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition whitespace-nowrap" onclick="Teacher.loadRanking(true)">전체 기록으로 다시 계산</button>
+    </div>
     <div class="overflow-hidden rounded-xl border border-slate-300 bg-white">
       <table class="w-full text-sm text-left text-gray-600">
         <thead class="text-xs text-slate-800 uppercase bg-slate-200"><tr>

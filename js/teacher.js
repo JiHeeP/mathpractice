@@ -211,10 +211,16 @@ function clearRecords() {
 }
 
 /* ═══ 대시보드 ═══ */
-function loadRanking() {
-  DB.getRanking(currentClass.code, 0, { full: true })   // 반 전체 기록으로 계산하고 학생 랭킹 요약도 채운다
+/* 랭킹 탭을 열 때는 학생별 최고점 요약(best, 학생 수만큼 읽기)만 읽는다.
+ * 반 전체 기록(4천 건 이상)으로 정확히 다시 계산하는 것은 버튼을 눌렀을 때만 — 하루 읽기 한도(5만 건) 보호.
+ * 전체 계산을 하면 그 결과로 학생들의 요약도 바로잡힌다. */
+function loadRanking(full) {
+  const btn = $('tRankingFullBtn');
+  if (full && btn) { btn.disabled = true; btn.textContent = '계산 중...'; }
+  DB.getRanking(currentClass.code, 0, { full: !!full })
     .then(list => App.renderRankingTable('tRankingBody', list, '아직 기록이 없습니다.'))
-    .catch(() => App.renderRankingTable('tRankingBody', [], '불러오기 실패'));
+    .catch(() => App.renderRankingTable('tRankingBody', [], '불러오기 실패'))
+    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = '전체 기록으로 다시 계산'; } });
 }
 
 /* ── 비교 날짜: 대상일은 오늘, 기준일은 그 앞의 '이전 등교일'을 자동으로 잡는다.
@@ -389,6 +395,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, printCards
 };
 })();
