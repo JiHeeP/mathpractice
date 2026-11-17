@@ -22,6 +22,7 @@ const CACHE_MS = 60 * 1000;
 const MINE_CACHE_MS = 30 * 60 * 1000;   // 내 기록 — 저장할 때 캐시에 직접 덧붙이므로 길게
 const RANK_CACHE_MS = 5 * 60 * 1000;    // 랭킹 — 친구 점수는 몇 분 늦게 보여도 된다
 const ALL_CACHE_MS = 10 * 60 * 1000;    // 반 전체 기록 (교사 화면 · 랭킹 대체 경로)
+const STUDENTS_CACHE_MS = 30 * 60 * 1000;   // 명단 — 거의 바뀌지 않고, 교사가 고치면 invalidate() 로 바로 비운다
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 헷갈리는 O/I/L/0/1 제외
 
 let db = null, fbAuth = null, mode = 'local';
@@ -222,7 +223,7 @@ async function getStudents(code) {
       list = snap.docs.map(d => ({ number: String(d.data().number ?? d.id), name: d.data().name || '', pinHash: d.data().pinHash || '' }));
     }
     return sortStudents(list.slice());
-  });
+  }, STUDENTS_CACHE_MS);
 }
 
 /** 추가/수정 — pin을 주면 새로 해시, 빈 값이면 기존 PIN 유지 */
