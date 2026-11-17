@@ -7,12 +7,12 @@
 <link rel="stylesheet" href="vendor/tailwind.css"/>
 <link rel="stylesheet" href="css/app.css"/>
 </head>
-<body class="bg-gradient-to-br from-yellow-50 via-orange-50 to-red-50 min-h-full p-4 font-sans selection:bg-orange-200">
+<body class="app-bg min-h-full p-4 font-sans">
 
-<div class="max-w-2xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border border-orange-100">
-<header id="appHeader" class="bg-gradient-to-r from-orange-400 to-red-400 text-white text-center py-6 px-4 shadow-md">
-  <h1 id="gameTitle" class="text-3xl font-black tracking-tight drop-shadow-md">분수 연산 마스터</h1>
-  <p id="classBadge" class="hidden mt-1 text-sm font-bold text-orange-100"></p>
+<div class="max-w-2xl mx-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden app-card">
+<header id="appHeader" class="app-hd text-center py-6 px-4">
+  <h1 id="gameTitle" class="text-3xl font-black tracking-tight">분수 연산 마스터</h1>
+  <p id="classBadge" class="hidden mt-1 text-sm font-bold app-hd-sub"></p>
 </header>
 <main class="p-6">
 
@@ -24,12 +24,12 @@
 <div id="classEntry" class="hidden text-center">
   <h2 class="text-xl font-bold text-gray-800 mb-2">우리 반 코드를 입력하세요</h2>
   <p class="text-sm text-gray-500 mb-4">선생님께 받은 6자리 코드 (QR을 찍으면 이 화면 없이 바로 들어가요)</p>
-  <div class="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+  <div class="box-main rounded-2xl p-5">
     <input id="classCodeInput" type="text" autocomplete="off" maxlength="6" placeholder="반 코드"
-      class="w-full px-4 py-3 rounded-xl border border-orange-300 text-center text-2xl tracking-[0.5em] font-black uppercase focus:outline-none focus:ring-2 focus:ring-orange-300"
+      class="w-full px-4 py-3 rounded-xl in-main text-center text-2xl tracking-[0.5em] font-black uppercase"
       onkeydown="if(event.key==='Enter')App.submitClassCode()"/>
     <div id="classCodeMessage" class="h-6 mt-3 text-sm font-bold text-red-500"></div>
-    <button class="w-full mt-3 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition" onclick="App.submitClassCode()">들어가기</button>
+    <button class="w-full mt-3 py-3 btn-main rounded-xl font-bold transition" onclick="App.submitClassCode()">들어가기</button>
   </div>
   <button class="mt-6 text-sm text-slate-500 underline hover:text-slate-700" onclick="Teacher.showLogin()">교사용 로그인</button>
 </div>
@@ -49,12 +49,12 @@
 <!-- ══ 학생 비밀번호 ══ -->
 <div id="studentPinScreen" class="hidden text-center">
   <h2 class="text-xl font-bold text-gray-800 mb-4" id="studentPinTitle">비밀번호를 써요</h2>
-  <div class="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+  <div class="box-main rounded-2xl p-5">
     <input id="studentPinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="비밀번호"
-      class="w-full px-4 py-3 rounded-xl border border-orange-300 text-center text-2xl tracking-[0.4em] font-bold focus:outline-none focus:ring-2 focus:ring-orange-300"
+      class="w-full px-4 py-3 rounded-xl in-main text-center text-2xl tracking-[0.4em] font-bold"
       onkeydown="if(event.key==='Enter')App.submitStudentPin()"/>
     <div id="studentPinMessage" class="h-6 mt-3 text-sm font-bold text-red-500"></div>
-    <button id="studentPinSubmitBtn" class="w-full mt-3 py-3 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition" onclick="App.submitStudentPin()">확인</button>
+    <button id="studentPinSubmitBtn" class="w-full mt-3 py-3 btn-main rounded-xl font-bold transition" onclick="App.submitStudentPin()">확인</button>
   </div>
   <button class="w-full mt-4 py-3 bg-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-400 transition" onclick="App.backToStudents()">← 뒤로</button>
 </div>
@@ -68,7 +68,7 @@
 <!-- ══ 레벨 카드 (연습 / 도전) ══ -->
 <div id="modeSelection" class="hidden">
   <div class="flex items-center justify-between mb-2">
-    <span id="modeLevel" class="text-sm font-black text-orange-700"></span>
+    <span id="modeLevel" class="text-sm font-black t-main"></span>
     <button class="text-sm font-bold text-slate-500 hover:text-slate-700" onclick="App.backToLevels()">← 목록</button>
   </div>
   <h2 id="modeTitle" class="text-2xl font-black text-gray-800 break-keep"></h2>
