@@ -59,7 +59,7 @@ function pick(i, btn) {
 
   if (ok) {
     btn.classList.add('qc-right');
-    fb.innerHTML = '<span class="text-green-600">정답입니다! ⭕</span>';
+    fb.innerHTML = '<span class="t-ok">정답입니다! ⭕</span>';
   } else {
     btn.classList.add('qc-wrong');
     document.querySelectorAll('.quiz-choice').forEach((b, j) => {
@@ -67,10 +67,10 @@ function pick(i, btn) {
     });
     let msg = chosen.near
       ? `<span class="text-amber-600">${chosen.near} ❌</span>`
-      : '<span class="text-red-500">틀렸습니다 ❌</span>';
+      : '<span class="t-no">틀렸습니다 ❌</span>';
     if (Session.isChallenge()) {
       Session.penalize(WRONG_TIME_PENALTY);
-      msg += `<div class="text-xs text-red-400 mt-1">⏱ 시간 −${WRONG_TIME_PENALTY}초</div>`;
+      msg += `<div class="text-xs t-no mt-1">⏱ 시간 −${WRONG_TIME_PENALTY}초</div>`;
     }
     fb.innerHTML = msg;
   }

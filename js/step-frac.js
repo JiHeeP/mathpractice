@@ -523,12 +523,12 @@ function finishStep(ok, fb, s, note, isYN) {
   const took = `<div class="text-sm font-bold text-gray-400 mt-1">⏱ 수행 시간 ${secText(ms)}</div>`;
   if (s.fn) s.fn();                                   // 맞든 틀리든 풀이판은 정답으로 진행
   if (ok) {
-    fb.innerHTML = '<span class="text-green-600">정답! ⭕</span>' + took;
+    fb.innerHTML = '<span class="t-ok">정답! ⭕</span>' + took;
     setTimeout(() => { waiting = false; idx++; showStep(); }, 600);
   } else {
     probOK = false;
     const answer = isYN ? `<b>${s.exp ? '예' : '아니오'}</b>` : expectedHTML(s.type, s.exp);
-    fb.innerHTML = `<span class="text-red-500">틀렸어요 ❌ 정답: ${answer}</span>` +
+    fb.innerHTML = `<span class="t-no">틀렸어요 ❌ 정답: ${answer}</span>` +
                    (note ? `<div class="text-sm text-amber-600 mt-1">${note}</div>` : '') + took;
     setTimeout(() => { waiting = false; idx++; showStep(); }, note ? 1800 : 1200);
   }
@@ -548,12 +548,12 @@ function onProbDone() {
   const p = prob;
   const ansHTML = p.pair ? `${fracHTML(p.pair[0])}<span class="pair-sep">${josa(p.pair[0].n, '과', '와')}</span>${fracHTML(p.pair[1])}` : p.answerIsMixed || p.mixedInput ? mixedHTML(p.answer) : fracHTML(p.answer);
   document.getElementById('stepQArea').innerHTML = `
-    <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 text-center">
+    <div class="box-ok p-6 rounded-2xl border-2 text-center">
       <div class="text-4xl mb-2">${probOK ? '🎉' : '💪'}</div>
-      <div class="text-xl font-black text-green-700 mb-2">${probOK ? '잘했어요!' : '한 번 더 해볼까요?'}</div>
+      <div class="text-xl font-black t-ok mb-2">${probOK ? '잘했어요!' : '한 번 더 해볼까요?'}</div>
       <div class="text-gray-500 mb-4 flex items-center justify-center gap-2 flex-wrap">${origHTML()}<span class="q-op">=</span>${ansHTML}</div>
       ${board}
-      <button onclick="StepFrac.next()" class="px-8 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 transition text-lg shadow-md active:scale-95">다음 문제 ▶</button>
+      <button onclick="StepFrac.next()" class="px-8 py-3 btn-main rounded-xl font-bold transition text-lg shadow-md active:scale-95">다음 문제 ▶</button>
     </div>`;
 }
 

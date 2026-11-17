@@ -89,8 +89,8 @@ function submit() {
     box.classList.add(results[i] ? 'ok' : 'no');
   });
   const fb = document.getElementById('numFb');
-  fb.innerHTML = ok ? '<span class="text-green-600">정답입니다! ⭕</span>'
-    : `<span class="text-red-500">틀렸습니다 ❌</span><div class="text-base text-gray-700 mt-1">정답: ${
+  fb.innerHTML = ok ? '<span class="t-ok">정답입니다! ⭕</span>'
+    : `<span class="t-no">틀렸습니다 ❌</span><div class="text-base text-gray-700 mt-1">정답: ${
         prob.fields.map(f => (f.label ? f.label + ' ' : '') + `<b>${ansText(f)}</b>`).join(' · ')}</div>`;
   paint();
   const done = Session.problemDone(ok);

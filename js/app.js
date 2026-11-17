@@ -128,7 +128,7 @@ function renderStudentButtons(list) {
   if (!list.length) { wrap.innerHTML = '<div class="col-span-full text-gray-500 py-4">아직 등록된 학생이 없어요. 선생님께 알려주세요!</div>'; return; }
   list.forEach(s => {
     const b = document.createElement('button');
-    b.className = 'p-2 bg-white border border-gray-200 rounded-lg text-sm font-bold hover:bg-orange-100 hover:border-orange-300 transition break-keep';
+    b.className = 'p-2 bg-white border border-gray-200 rounded-lg text-sm font-bold stu-btn transition break-keep';
     b.textContent = `${s.number}. ${s.name}`;
     b.onclick = () => selectStudent(s.number, s.name, b);
     wrap.appendChild(b);
@@ -138,11 +138,11 @@ function renderStudentButtons(list) {
 function selectStudent(no, name, btn) {
   resetStudent();
   state.studentNo = no; state.studentName = name;
-  document.querySelectorAll('#studentButtons button').forEach(b => b.classList.remove('ring-2','ring-orange-400','bg-orange-50'));
-  btn.classList.add('ring-2','ring-orange-400','bg-orange-50');
+  document.querySelectorAll('#studentButtons button').forEach(b => b.classList.remove('stu-on'));
+  btn.classList.add('stu-on');
   const go = $('goToPinBtn');
   go.disabled = false;
-  go.classList.replace('bg-gray-300','bg-orange-500');
+  go.classList.replace('bg-gray-300','btn-main');
   $('gameTitle').textContent = titleFor(no);
 }
 
@@ -175,7 +175,7 @@ function backToStudents() {
   resetStudent();
   $('gameTitle').textContent = '분수 연산 마스터';
   const go = $('goToPinBtn');
-  go.disabled = true; go.classList.replace('bg-orange-500','bg-gray-300');
+  go.disabled = true; go.classList.replace('btn-main','bg-gray-300');
   loadStudents('');
 }
 
@@ -277,7 +277,7 @@ function renderLevelButtons() {
   } else {
     card.innerHTML = `<span class="next-k">오늘 할 것</span>
       <div class="next-t">모든 레벨을 통과했어요! 🎉</div>
-      <div class="text-sm font-bold text-orange-800">아래에서 다시 풀고 싶은 레벨을 골라요.</div>`;
+      <div class="text-sm font-bold t-main">아래에서 다시 풀고 싶은 레벨을 골라요.</div>`;
   }
   container.appendChild(card);
 
