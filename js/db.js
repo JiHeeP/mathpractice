@@ -426,11 +426,11 @@ async function saveResult(code, payload, opts) {
     return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
   addToCache(code, id, row);
+  if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
   if (sent === 'rejected') {
     return { displayScore: outcome.displayScore, scoreRecorded: false, isError: true,
              message: '⚠️ 기록이 서버에 저장되지 않았어요. 이 기기에 남겨 두었으니 선생님께 알려 주세요.' };
   }
-  if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
   if (sent !== true) {
     return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
              message: '인터넷이 불안정해서 이 기기에 먼저 저장했어요. 연결되면 자동으로 올라가요.' };
@@ -708,12 +708,12 @@ function fmtTime(ts) {
 }
 
 return {
-  init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate,
+  init, get mode() { return mode; }, isLocal, hashPin, dateKey, invalidate, rejectedCount,
   auth,
   listClasses, createClass, renameClass, archiveClass, getClass, setOffDays,
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
-  saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox, rejectedCount,
+  saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
   getBestScores, getHistory, getRanking, getComparison, getAccessAlerts, clearRecords
 };
 })();
