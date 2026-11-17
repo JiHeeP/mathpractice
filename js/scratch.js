@@ -5,13 +5,28 @@
  */
 const Scratch = (() => {
   let cv = null, ctx = null, drawing = false, last = null;
+  /* 되돌리기 — 획을 긋기 직전(또는 지우기 직전) 그림을 쌓아 둔다. 최근 20개까지 */
+  let undoStack = [];
+  const UNDO_MAX = 20;
+  function paintUndo() { const b = document.getElementById('scratchUndo'); if (b) b.disabled = !undoStack.length; }
+  function snap() {
+    if (!cv || !cv.width || !cv.height) return;
+    undoStack.push(ctx.getImageData(0, 0, cv.width, cv.height));
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    paintUndo();
+  }
+  function undo() {
+    const img = undoStack.pop();
+    if (img && cv && img.width === cv.width && img.height === cv.height) ctx.putImageData(img, 0, 0);
+    paintUndo();
+  }
 
   /** 문제 카드 HTML 을 연습장과 나란히 감싼다. 연습장이 없는 레벨이면 그대로 돌려준다 */
   function wrap(cfg, cardHTML) {
     if (!cfg || !cfg.scratch) { cv = null; return cardHTML; }
     return `<div class="num-layout">${cardHTML}
       <div class="scratch">
-        <div class="scratch-head"><span>✏️ 계산 연습장</span><button id="scratchClear" class="scratch-clear">지우기</button></div>
+        <div class="scratch-head"><span>✏️ 계산 연습장</span><span class="flex gap-2"><button id="scratchUndo" class="scratch-clear" disabled>↶ 되돌리기</button><button id="scratchClear" class="scratch-clear">지우기</button></span></div>
         <canvas id="scratchCanvas"></canvas>
       </div></div>`;
   }
@@ -21,7 +36,8 @@ const Scratch = (() => {
     setWide(!!el);
     if (!el) { cv = null; return; }
     attach(el);
-    document.getElementById('scratchClear').onclick = clear;
+    document.getElementById('scratchClear').onclick = () => { snap(); clear(true); };
+    document.getElementById('scratchUndo').onclick = undo;
   }
 
   /* 연습장을 옆에 두려고 넓은 화면에서는 앱 틀을 넓힌다. 풀이 화면을 떠나면 원래대로 */
@@ -39,12 +55,13 @@ const Scratch = (() => {
     if (cv.width === w && cv.height === h) return;
     const keep = cv.width ? ctx.getImageData(0, 0, cv.width, cv.height) : null;
     cv.width = w; cv.height = h;
+    undoStack = []; paintUndo();                     // 크기가 바뀌면 쌓아 둔 그림은 맞지 않는다
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = '#1f2937';
     if (keep) ctx.putImageData(keep, 0, 0);
   }
   const pos = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-  function down(e) { fit(); drawing = true; last = pos(e); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); dot(last); e.preventDefault(); }
+  function down(e) { fit(); snap(); drawing = true; last = pos(e); cv.setPointerCapture && cv.setPointerCapture(e.pointerId); dot(last); e.preventDefault(); }
   function move(e) {
     if (!drawing) return;
     const p = pos(e);
@@ -60,7 +77,8 @@ const Scratch = (() => {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, up));
     requestAnimationFrame(fit);
   }
-  function clear() { if (!cv || !ctx) return; fit(); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore(); }
+  /** keepUndo 가 아니면(다음 문제로 넘어갈 때) 되돌리기 기록도 비운다 */
+  function clear(keepUndo) { if (!cv || !ctx) return; if (keepUndo !== true) { undoStack = []; paintUndo(); } fit(); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore(); }
   window.addEventListener('resize', fit);
   function clearIfAny() { if (cv && document.body.contains(cv)) clear(); }
   return { wrap, mount, clear: clearIfAny };

@@ -84,6 +84,15 @@ function pick(i, btn) {
   }, ok ? 700 : (chosen.near ? 1800 : 1300));
 }
 
+/* 키보드 1~4 — 보기 순서대로(왼쪽 위 1, 오른쪽 위 2, 왼쪽 아래 3, 오른쪽 아래 4). 풀이 화면이 보일 때만 */
+document.addEventListener('keydown', e => {
+  if (waiting || !cur || !document.getElementById('quizChoices')) return;
+  const i = '1234'.indexOf(e.key);
+  if (i === -1 || e.target.closest && e.target.closest('input, textarea')) return;
+  const btn = document.querySelectorAll('.quiz-choice')[i];
+  if (btn) { e.preventDefault(); pick(i, btn); }
+});
+
 /** 테스트 전용 — 현재 문제의 정답 보기 인덱스 */
 function debugCorrectIndex() { return cur ? cur.choices.findIndex(c => c.correct) : -1; }
 

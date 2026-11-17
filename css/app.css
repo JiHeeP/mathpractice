@@ -209,6 +209,8 @@ body.num-wide .app-shell{max-width:64rem}
 .scratch-head{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;font-weight:900;color:#6b7280;padding:0 .2rem}
 .scratch-clear{padding:.35rem .9rem;border-radius:9999px;background:#f3f4f6;color:#374151;font-size:.85rem;font-weight:900}
 .scratch-clear:active{background:#e5e7eb}
+.scratch-clear:disabled{opacity:.4}
+@media (hover:none) and (pointer:coarse){.hide-touch{display:none}}
 #scratchCanvas{width:100%;height:320px;border-radius:.75rem;touch-action:none;cursor:crosshair;
   background-color:#fffef7;background-image:linear-gradient(#e8eef7 1px,transparent 1px),linear-gradient(90deg,#e8eef7 1px,transparent 1px);background-size:28px 28px}
 @media(min-width:900px){#scratchCanvas{flex:1;height:auto;min-height:520px}}

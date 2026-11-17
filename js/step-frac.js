@@ -380,6 +380,8 @@ function inputHTML(type) {
     return `<div class="flex justify-center gap-4">
       <button class="yn-btn yn-yes" onclick="StepFrac.answerYN(true)">⭕ 예</button>
       <button class="yn-btn yn-no" onclick="StepFrac.answerYN(false)">❌ 아니오</button>
+    </div>
+    <div class="text-xs text-gray-400 font-bold mt-2 hide-touch">키보드: Y 예 · N 아니오
     </div>`;
   }
   const box = (id, ph) => `<input type="text" inputmode="none" id="${id}" placeholder="${ph}" class="fi-box" autocomplete="off"/>`;
@@ -588,9 +590,20 @@ function onProbDone() {
       <div class="text-xl font-black t-ok mb-2">${probOK ? '잘했어요!' : '한 번 더 해볼까요?'}</div>
       <div class="text-gray-500 mb-4 flex items-center justify-center gap-2 flex-wrap">${origHTML()}<span class="q-op">=</span>${ansHTML}</div>
       ${board}
-      <button onclick="StepFrac.next()" class="px-8 py-3 btn-main rounded-xl font-bold transition text-lg shadow-md active:scale-95">다음 문제 ▶</button>
+      <button id="stepNext" onclick="StepFrac.next()" class="px-8 py-3 btn-main rounded-xl font-bold transition text-lg shadow-md active:scale-95">다음 문제 ▶</button>
     </div>`;
 }
+
+/* 키보드 — 예/아니오 단계는 Y·N(또는 ←·→), 문제를 다 풀고 나면 Enter 로 '다음 문제'. 칸에 치는 중일 때는 칸의 Enter 처리를 따른다 */
+document.addEventListener('keydown', e => {
+  const qa = document.getElementById('stepQArea');
+  if (!qa || !steps || (e.target.closest && e.target.closest('input, textarea'))) return;
+  const s = steps[idx];
+  if (s && s.type === 'yn' && !waiting) {
+    if (e.code === 'KeyY' || e.key === 'ArrowLeft') { e.preventDefault(); answerYN(true); }
+    else if (e.code === 'KeyN' || e.key === 'ArrowRight') { e.preventDefault(); answerYN(false); }
+  } else if (e.key === 'Enter' && document.getElementById('stepNext')) { e.preventDefault(); next(); }
+});
 
 /** 테스트 전용 — 지금 단계(종류 · 정답 · 이름)와 문제 */
 function debugStep() { const s = steps[idx]; return s ? { type: s.type, exp: s.exp, desc: s.desc, idx, total: steps.length } : null; }
