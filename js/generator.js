@@ -765,7 +765,11 @@ function genMul1() {   // (두·세 자리) × (한 자리)
 function nonRound(lo, hi) { for (;;) { const n = randInt(lo, hi); if (n % 10) return n; } }
 function genMul22() { const a = nonRound(12, 99), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
 function genMul32() { const a = nonRound(102, 999), b = nonRound(12, 99); return one(opHTML(a, '×', b), a * b); }
-function genDiv99() { const b = randInt(2, 9), q = randInt(2, 9); return one(opHTML(b * q, '÷', b), q); }
+function genDiv99() {   // 몫은 늘 한 자리(2~9) — auto: 숫자 하나를 누르면 바로 채점(numinput.js)
+  const b = randInt(2, 9), q = randInt(2, 9), p = one(opHTML(b * q, '÷', b), q);
+  p.fields[0].auto = true;
+  return p;
+}
 function genDiv21() {   // 두 자리 ÷ 한 자리, 몫이 두 자리일 때가 많게
   for (;;) { const b = randInt(2, 9), a = randInt(10, 99); if (Math.floor(a / b) >= 3) return divQR(a, b); }
 }
@@ -780,7 +784,7 @@ function divisorsOf(n) { const d = []; for (let i = 1; i <= n; i++) if (n % i ==
 function genDivisors() {   // 약수가 4개 이상인 6~60
   for (;;) {
     const n = randInt(6, 60), d = divisorsOf(n);
-    if (d.length >= 4) return { display: `<span>${n}의 약수를 모두 쓰세요</span>`, fields: [{ label: '', ans: d, list: true }] };
+    if (d.length >= 4) return { display: `<span>${n}의 약수를 모두 쓰세요</span>`, fields: [{ label: '', ans: d, list: true, grow: true }] };   // grow: 개수를 미리 보여 주지 않고 쓰는 만큼 칸이 늘어남
   }
 }
 function genMultiples() {

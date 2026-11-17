@@ -1,12 +1,18 @@
 /* numinput.js — 숫자 직접 입력 엔진 (기초 연산 B1~B10)
- * 문제는 generator.js 의 generateNumProblem 이 만든 { display, fields:[{label, ans, list?}] }.
- * 화면 숫자판(js/numpad.js — 0~9 · 지우기 · 쉼표 · 다음 칸/확인)으로 칸을 채운다. 키보드로 쳐도 된다.
- *   - 칸이 여러 개면(몫·나머지) 칸을 눌러 옮기거나 '다음 칸 ▶'(키보드 Enter)으로 넘어간다. 마지막 칸에서는 '확인'
- *   - list 칸(약수·배수)은 쉼표로 구분해 여러 수를 쓴다. 순서는 상관없다
+ * 문제는 generator.js 의 generateNumProblem 이 만든 { display, fields:[{label, ans, list?, grow?, auto?}] }.
+ * 화면 숫자판(js/numpad.js — 0~9 · 지우기 · 다음 칸/확인)으로 칸을 채운다. 키보드로 쳐도 된다.
+ *
+ * 칸 = 수 하나. 문제 유형마다 칸 모양이 다르다 (선생님 결정 2026-11-17)
+ *   - 몫·나머지: "126 ÷ 5 = [몫] … [나머지]" 한 줄. '다음 칸'으로 나머지로 간다. 나머지 크기 경고는 하지 않는다
+ *   - 약수(grow): 수마다 칸 하나. 칸을 채우고 '다음 칸'을 누르면 새 칸이 생긴다. 약수 개수는 미리 보여 주지 않는다
+ *     빈 칸에서 '확인'. 빈 칸에서 지우기를 누르면 그 칸이 없어지고 앞 칸으로 간다
+ *   - 배수·공배수(list): 문제에 나온 개수만큼 칸을 미리 보여 준다(개수는 문제에 이미 있다)
+ *   - 한 자리 답(auto, B5): 숫자 하나를 누르면 바로 채점한다(확인 키 없음)
+ * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
  */
 const NumInput = (() => {
-let level, cfg, prob, vals, cur, waiting;
+let level, cfg, prob, boxes, cur, waiting, marks;
 
 function init(lv, mode, config, onExit) {
   level = lv; cfg = config;
@@ -23,87 +29,127 @@ function init(lv, mode, config, onExit) {
   next();
 }
 
+/* 칸 목록 — { f: 몇 번째 field, v: 쓴 수(문자열) } */
+function makeBoxes() {
+  const out = [];
+  prob.fields.forEach((f, i) => {
+    const n = f.list && !f.grow ? f.ans.length : 1;
+    for (let k = 0; k < n; k++) out.push({ f: i, v: '' });
+  });
+  return out;
+}
+const fieldOf = b => prob.fields[boxes[b].f];
+const isGrow = b => !!fieldOf(b).grow;
+const isQR = () => prob.fields.length === 2 && prob.fields[0].label === '몫';
+const isAuto = () => prob.fields.length === 1 && !!prob.fields[0].auto;
 
 function next() {
   prob = Gen.generateNumProblem(level);
-  vals = prob.fields.map(() => '');
-  cur = 0; waiting = false;
+  boxes = makeBoxes();
+  cur = 0; waiting = false; marks = null;
   Scratch.clear();
-  const hasList = prob.fields.some(f => f.list);
   document.getElementById('numBody').innerHTML = `
-    <div class="text-center mb-4"><div class="quiz-q num-q">${prob.display}</div></div>
-    <div class="num-fields">${prob.fields.map((f, i) => `
-      <button class="num-field" data-i="${i}">${f.label ? `<span class="num-lbl">${f.label}</span>` : ''}<span class="num-val" id="numVal${i}"></span></button>`).join('')}
-    </div>
-    ${hasList ? '<div class="text-center text-xs font-bold text-gray-400 mt-1">수와 수 사이에 쉼표( , )를 넣어요</div>' : ''}
+    <div id="numStage"></div>
     <div id="numFb" class="min-h-8 mt-2 text-center font-bold text-lg"></div>
-    ${NumPad.html(hasList ? { extra: ',', extraLabel: '쉼표<br><b class="text-2xl">,</b>' } : {})}
-`;
-  document.querySelectorAll('.num-field').forEach(b => b.onclick = () => { if (!waiting) { cur = +b.dataset.i; paint(); } });
+    ${NumPad.html(isAuto() ? { noGo: true } : {})}`;
   NumPad.bind(document.getElementById('numBody'), press);
   paint();
 }
 
-/** 지금 칸 말고 빈칸이 남았으면 '다음 칸 ▶', 아니면 '확인' */
-const isLast = () => !vals.some((v, i) => i !== cur && v.trim() === '');
+function boxHTML(b) {
+  const f = fieldOf(b), cls = ['num-field'];
+  if (f.list) cls.push('num-item');
+  if (b === cur && !waiting) cls.push('on');
+  if (marks) cls.push(marks[b]);
+  const lbl = f.label ? `<span class="num-lbl">${f.label}</span>` : '';
+  return `<button type="button" class="${cls.join(' ')}" data-b="${b}">${lbl}<span class="num-val">${boxes[b].v}</span></button>`;
+}
 
 function paint() {
-  prob.fields.forEach((f, i) => {
-    const el = document.getElementById('numVal' + i);
-    if (el) el.textContent = vals[i];
-    const box = el && el.parentElement;
-    if (box) box.classList.toggle('on', i === cur && !waiting);
-  });
-  NumPad.setGo(isLast());
+  const stage = document.getElementById('numStage');
+  if (!stage) return;
+  const shown = boxes.map((x, b) => b).filter(b => !(marks && isGrow(b) && !boxes[b].v));   // 채점 뒤에는 남은 빈 칸을 숨긴다
+  if (isQR()) {
+    stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(0)}<span class="q-op">…</span>${boxHTML(1)}</div>`;
+  } else {
+    stage.innerHTML = `<div class="text-center mb-4"><div class="quiz-q num-q">${prob.display}</div></div>
+      <div class="num-fields">${shown.map(boxHTML).join('')}</div>`;
+  }
+  stage.querySelectorAll('[data-b]').forEach(el => el.onclick = () => { if (!waiting) { cur = +el.dataset.b; paint(); } });
+  NumPad.setGo(target() === null);
+}
+
+/** '다음 칸'을 누르면 갈 곳 — 칸 번호, 'new'(약수 칸 하나 더), null(남은 칸이 없으니 확인) */
+function target() {
+  const need = b => !isGrow(b) && !boxes[b].v;              // 꼭 채워야 하는 빈 칸
+  for (let b = cur + 1; b < boxes.length; b++) if (need(b)) return b;
+  if (isGrow(cur) && boxes[cur].v) {
+    const f = boxes[cur].f;
+    const empty = boxes.findIndex((x, b) => x.f === f && !x.v);
+    return empty !== -1 ? empty : 'new';
+  }
+  for (let b = 0; b < boxes.length; b++) if (b !== cur && need(b)) return b;
+  return null;
 }
 
 function press(k) {
   if (waiting) return;
-  const f = prob.fields[cur];
   const fbEl = document.getElementById('numFb');
   if (fbEl && fbEl.querySelector('.text-amber-600')) fbEl.innerHTML = '';   // 안내는 다시 누르면 지운다
-  if (k === 'go' || k === 'ok') {
-    if (isLast()) return submit();
-    const empty = vals.findIndex((v, i) => i > cur && v.trim() === '');
-    cur = empty !== -1 ? empty : vals.findIndex(v => v.trim() === '');
+  const box = boxes[cur];
+  if (k === 'go' || k === 'ok' || k === ',') {
+    const t = target();
+    if (t === null) return submit();
+    if (t === 'new') { boxes.splice(cur + 1, 0, { f: box.f, v: '' }); cur++; }
+    else cur = t;
     return paint();
   }
-  if (k === 'clear') vals[cur] = '';
-  else if (k === 'del' || k === '⌫') vals[cur] = /, $/.test(vals[cur]) ? vals[cur].slice(0, -2) : vals[cur].slice(0, -1);
-  else if (k === ',') { if (f.list && vals[cur] && !/, $/.test(vals[cur])) vals[cur] += ', '; }
-  else if (/^\d$/.test(k)) {
-    const tail = vals[cur].split(',').pop().trim();
-    if (tail.length < 6 && tail !== '0') vals[cur] += k;   // 0 으로 시작하는 수(05)는 막는다
+  if (k === 'clear') box.v = '';
+  else if (k === 'del' || k === '⌫') {
+    if (!box.v && isGrow(cur) && boxes.filter(x => x.f === box.f).length > 1) {   // 빈 약수 칸은 없애고 앞 칸으로
+      boxes.splice(cur, 1); cur = Math.max(0, cur - 1);
+    } else box.v = box.v.slice(0, -1);
+  } else if (/^\d$/.test(k)) {
+    if (box.v === '0') box.v = k;                          // 0 으로 시작하는 수(05)는 만들지 않는다
+    else if (box.v.length < 6) box.v += k;
+    if (isAuto()) { paint(); return submit(); }           // 한 자리 답은 바로 채점
   }
   paint();
 }
 
-const nums = v => v.split(',').map(x => x.trim()).filter(Boolean).map(Number);
-
-function fieldOK(f, v) {
-  if (!f.list) return v !== '' && Number(v) === f.ans;
-  const got = nums(v).sort((a, b) => a - b), want = f.ans.slice().sort((a, b) => a - b);
-  return got.length === want.length && got.every((x, i) => x === want[i]);
+/** 칸마다 맞았나(ok/no). list 는 순서 상관없이 정답 목록에 있는 수면 ok */
+function judge() {
+  return boxes.map(x => {
+    const f = prob.fields[x.f];
+    if (!x.v) return '';
+    return (f.list ? f.ans.includes(Number(x.v)) : Number(x.v) === f.ans) ? 'ok' : 'no';
+  });
+}
+function fieldOK(fi) {
+  const f = prob.fields[fi], got = boxes.filter(x => x.f === fi && x.v).map(x => Number(x.v));
+  if (!f.list) return got.length === 1 && got[0] === f.ans;
+  const want = f.ans.slice().sort((a, b) => a - b), g = got.slice().sort((a, b) => a - b);
+  return g.length === want.length && g.every((x, i) => x === want[i]);
 }
 const ansText = f => f.list ? f.ans.join(', ') : String(f.ans);
 
 function submit() {
-  // 빈 칸이 있으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)
-  const empty = vals.findIndex(v => v.trim() === '');
+  // 꼭 채워야 할 칸이 비었으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)
+  const empty = boxes.findIndex((x, b) => !x.v && !isGrow(b));
   if (empty !== -1) { cur = empty; paint(); return; }
+  const fb = document.getElementById('numFb');
+  if (prob.fields.some((f, i) => f.grow && !boxes.some(x => x.f === i && x.v))) {
+    fb.innerHTML = '<span class="text-amber-600 text-base">수를 하나 이상 써 주세요.</span>';
+    return;
+  }
   // 같은 수를 두 번 쓴 것은 입력 실수 — 채점하지 않고 알려 준다(어느 수인지는 학생이 찾는다)
-  if (prob.fields.some((f, i) => f.list && new Set(nums(vals[i])).size !== nums(vals[i]).length)) {
-    document.getElementById('numFb').innerHTML = '<span class="text-amber-600 text-base">같은 수를 두 번 썼어요. 하나를 지워 주세요.</span>';
+  if (prob.fields.some((f, i) => { const v = boxes.filter(x => x.f === i && x.v).map(x => x.v); return f.list && new Set(v).size !== v.length; })) {
+    fb.innerHTML = '<span class="text-amber-600 text-base">같은 수를 두 번 썼어요. 하나를 지워 주세요.</span>';
     return;
   }
   waiting = true;
-  const results = prob.fields.map((f, i) => fieldOK(f, vals[i]));
-  const ok = results.every(Boolean);
-  prob.fields.forEach((f, i) => {
-    const box = document.getElementById('numVal' + i).parentElement;
-    box.classList.add(results[i] ? 'ok' : 'no');
-  });
-  const fb = document.getElementById('numFb');
+  marks = judge();
+  const ok = prob.fields.every((f, i) => fieldOK(i));
   fb.innerHTML = ok ? '<span class="t-ok">정답입니다! ⭕</span>'
     : `<span class="t-no">틀렸습니다 ❌</span><div class="text-base text-gray-700 mt-1">정답: ${
         prob.fields.map(f => (f.label ? f.label + ' ' : '') + `<b>${ansText(f)}</b>`).join(' · ')}</div>`;
@@ -116,14 +162,14 @@ function submit() {
   }, ok ? 700 : 2200);
 }
 
-/* 키보드 입력 — 풀이 화면이 보일 때만 */
+/* 키보드 입력 — 풀이 화면이 보일 때만. 쉼표·스페이스·Enter·Tab 은 '다음 칸' */
 document.addEventListener('keydown', e => {
-  if (!prob || !document.getElementById('numBody')) return;
+  if (!prob || !document.getElementById('numStage')) return;
   if (/^\d$/.test(e.key)) press(e.key);
-  else if (e.key === ',' || e.key === ' ') { e.preventDefault(); press(','); }   // 스페이스도 쉼표로
+  else if (e.key === ',' || e.key === ' ') { e.preventDefault(); press(','); }
   else if (e.key === 'Backspace') { e.preventDefault(); press('⌫'); }
   else if (e.key === 'Enter') { e.preventDefault(); press('go'); }
-  else if (e.key === 'Tab' && prob.fields.length > 1 && !waiting) { e.preventDefault(); cur = (cur + 1) % prob.fields.length; paint(); }
+  else if (e.key === 'Tab' && boxes.length > 1 && !waiting) { e.preventDefault(); cur = (cur + 1) % boxes.length; paint(); }
 });
 
 /** 테스트 전용 — 지금 문제 */

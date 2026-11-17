@@ -438,7 +438,8 @@ function padKey(k) {
 }
 
 function wireInputs(type) {
-  order = type === 'num' ? ['fiNum'] : type === 'row' ? ['fiA','fiB','fiN','fiD'] : type === 'mixed' ? ['fiW','fiN','fiD'] : ['fiN','fiD'];
+  // 분수는 분모 칸부터 쓴다(선생님 결정 2026-11-17). 대분수는 정수 → 분모 → 분자
+  order = type === 'num' ? ['fiNum'] : type === 'row' ? ['fiA','fiB','fiD','fiN'] : type === 'mixed' ? ['fiW','fiD','fiN'] : ['fiD','fiN'];
   order.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
