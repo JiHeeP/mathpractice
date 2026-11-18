@@ -193,6 +193,11 @@
 .num-item{flex:0 0 auto;min-width:4.6rem;padding:.3rem .6rem}
 .num-line{gap:.5rem}
 .np-x .np-extra[data-k="."]{font-size:2.2rem;font-weight:900}
+.shape-wrap{display:flex;justify-content:center}.shape-svg{max-width:100%;height:auto}
+.shape-ask{font-size:1.15rem;font-weight:800;color:#1e293b;margin-top:.25rem}
+.shape-note{font-size:.75rem;font-weight:700;color:#94a3b8;margin-top:.1rem}
+.num-unit{font-size:1.6rem;font-weight:900}
+.num-area{flex-wrap:nowrap}.num-area .num-field{min-width:5rem}
 .num-dhelp{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.4rem;margin-top:.75rem;font-weight:700;color:#475569}
 /* 세로셈 (B1~B4) — 답은 자릿수 칸, 도움 칸(부분곱)은 한 줄씩 왼쪽으로 한 자리 밀린다 */
 .vt{display:grid;grid-template-columns:auto auto;justify-content:center;column-gap:.6rem;row-gap:.3rem;font-size:2.2rem;font-weight:900;color:#1f2937;text-align:right;font-variant-numeric:tabular-nums;margin-bottom:.6rem}

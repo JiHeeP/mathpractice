@@ -878,12 +878,60 @@ function decMulQuestion() {
   };
 }
 
+/* ═══════════ 도형의 넓이 A1~A6 ═══════════
+ * 문제 = { display: 그림(SVG) + 물음, fields: [{ label:'', ans: 넓이, unit:'cm²' }], shape, dims }
+ * 답은 늘 자연수(÷2 가 있는 도형은 나누어떨어지게). 25%는 m 단위.
+ * 함정 숫자(옆변)는 shapes.js 가 그린 모양에서 잰 길이 — 늘 높이보다 길다.
+ */
+const AREA_NAMES = { rect: '직사각형', square: '정사각형', para: '평행사변형', tri: '삼각형', rhom: '마름모', trap: '사다리꼴' };
+function areaQ(shape, u, svg, ans, dims, named) {
+  const ask = named ? `${AREA_NAMES[shape]}의 넓이는 몇 ${u}²인가요?` : `도형의 넓이는 몇 ${u}²인가요?`;
+  return { display: `<div class="shape-wrap">${svg}</div><div class="shape-ask">${ask}</div><div class="shape-note">그림은 실제 크기와 달라요</div>`,
+    fields: [{ label: '', ans, unit: `${u}²` }], shape, dims };
+}
+const evenProduct = (lo1, hi1, lo2, hi2) => { for (;;) { const a = randInt(lo1, hi1), b = randInt(lo2, hi2); if ((a * b) % 2 === 0) return [a, b]; } };
+const unitPick = () => (Math.random() < 0.25 ? 'm' : 'cm');
+const SHAPE_GENS = {
+  rect(named) {
+    const u = unitPick();
+    if (Math.random() < 0.3) { const s = randInt(3, 15); return areaQ('square', u, window.Shapes.rect(s, s, u, true).svg, s * s, { s }, named); }
+    let w, h; do { w = randInt(3, 15); h = randInt(2, 12); } while (w === h);
+    return areaQ('rect', u, window.Shapes.rect(w, h, u, false).svg, w * h, { w, h }, named);
+  },
+  para(named) {
+    const u = unitPick(), b = randInt(4, 15), h = randInt(3, 12), g = window.Shapes.parallelogram(b, h, u);
+    return areaQ('para', u, g.svg, b * h, { b, h, side: g.side }, named);
+  },
+  tri(named) {
+    const u = unitPick(), [b, h] = evenProduct(4, 16, 3, 14);
+    const r = Math.random(), apex = r < 0.2 ? -Math.round(b * 0.3) : r < 0.35 ? Math.round(b * 1.3) : Math.round(b * (0.2 + Math.random() * 0.6));
+    const g = window.Shapes.triangle(b, h, apex, u);
+    return areaQ('tri', u, g.svg, b * h / 2, { b, h, side: g.side, apex }, named);
+  },
+  rhom(named) {
+    const u = unitPick(); let d1, d2; do { [d1, d2] = evenProduct(4, 16, 4, 16); } while (d1 === d2);
+    return areaQ('rhom', u, window.Shapes.rhombus(d1, d2, u).svg, d1 * d2 / 2, { d1, d2 }, named);
+  },
+  trap(named) {
+    const u = unitPick();
+    for (;;) {
+      const a = randInt(2, 12), b = randInt(a + 2, 18), h = randInt(2, 12);
+      if (((a + b) * h) % 2) continue;
+      const g = window.Shapes.trapezoid(a, b, h, u);
+      return areaQ('trap', u, g.svg, (a + b) * h / 2, { a, b, h, side: g.side }, named);
+    }
+  }
+};
+
 const NUM_GENS = {
   'b-sub3': genSub3, 'b-mul-1': genMul1, 'b-mul-22': genMul22, 'b-mul-32': genMul32,
   'b-div-99': genDiv99, 'b-div-21': genDiv21, 'b-div-31': genDiv31, 'b-div-x2': genDivX2,
   'b-divisors': genDivisors, 'b-multiples': genMultiples,
   'd-mul-dn': () => genDecNat(false), 'd-mul-nd': () => genDecNat(true), 'd-mul-11': genDec11,
-  'd-mul-21': genDec21, 'd-mul-shift': genDecShift
+  'd-mul-21': genDec21, 'd-mul-shift': genDecShift,
+  'a-rect': () => SHAPE_GENS.rect(true), 'a-para': () => SHAPE_GENS.para(true), 'a-tri': () => SHAPE_GENS.tri(true),
+  'a-rhom': () => SHAPE_GENS.rhom(true), 'a-trap': () => SHAPE_GENS.trap(true),
+  'a-mix':  () => SHAPE_GENS[pick(['rect', 'para', 'tri', 'rhom', 'trap'])](false)   // 섞어서 — 도형 이름을 알려 주지 않는다
 };
 
 function generateNumProblem(level) {

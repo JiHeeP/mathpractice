@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const ctx = { console, Math, JSON, Object, Array, String, Number, Error };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['js/fraction.js', 'js/decimal.js', 'js/pictures.js', 'js/levels.js', 'js/generator.js']) {
+for (const f of ['js/fraction.js', 'js/decimal.js', 'js/pictures.js', 'js/shapes.js', 'js/levels.js', 'js/generator.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const L = ctx.Levels, G = ctx.Gen;
@@ -20,12 +20,12 @@ const check = (name, cond) => { console.log((cond ? '  ✔ ' : '  ✘ ') + name)
 console.log('트랙');
 check('분수·소수 트랙 37레벨 그대로', L.LEVEL_ORDER.length === 37 && L.TRACKS.frac.levels === L.LEVEL_ORDER);
 check('기초 트랙 B1~B10', L.BASIC_ORDER.join() === 'B1,B2,B3,B4,B5,B6,B7,B8,B9,B10');
-check('모든 레벨 53개(기초 10 + 분수·소수 37 + 소수의 곱셈 6), 겹침 없음', L.ALL_LEVELS.length === 53 && new Set(L.ALL_LEVELS).size === 53);
+check('모든 레벨 59개(기초 10 + 분수·소수 37 + 소수의 곱셈 6 + 도형의 넓이 6), 겹침 없음', L.ALL_LEVELS.length === 59 && new Set(L.ALL_LEVELS).size === 59);
 check('레벨 이름 8자 이하 (보안 규칙)', L.ALL_LEVELS.every(lv => lv.length <= 8));
 check('모든 만점 ≤ 300 (보안 규칙)', L.ALL_LEVELS.every(lv => L.LEVEL_MAX[lv] <= 300));
 check('기존 레벨 문제 수 그대로 (L1 20 · L11 10 · L15 8)', L.LEVEL_CONFIGS.L1.chalQ === 20 && L.LEVEL_CONFIGS.L11.chalQ === 10 && L.LEVEL_CONFIGS.L15.chalQ === 8);
 
-check('계산 연습장 25레벨(소수의 곱셈 5개 포함), 모두 4지선다·숫자 입력', L.SCRATCH_LEVELS.length === 25 && L.SCRATCH_LEVELS.every(lv => L.LEVEL_CONFIGS[lv].scratch && L.LEVEL_CONFIGS[lv].engine !== 'frac'));
+check('계산 연습장 30레벨(소수의 곱셈 5개 · 넓이 5개 포함), 모두 4지선다·숫자 입력', L.SCRATCH_LEVELS.length === 30 && L.SCRATCH_LEVELS.every(lv => L.LEVEL_CONFIGS[lv].scratch && L.LEVEL_CONFIGS[lv].engine !== 'frac'));
 check('B5·L1·L11 에는 연습장 없음', !L.LEVEL_CONFIGS.B5.scratch && !L.LEVEL_CONFIGS.L1.scratch && !L.LEVEL_CONFIGS.L11.scratch);
 
 console.log('잠금');
