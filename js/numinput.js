@@ -11,13 +11,15 @@
  *   - 세로셈(vert, B1~B4): 문제를 세로로 쓰고, 답은 자릿수 칸에 채운다.
  *     B1(뺄셈, vert.rtl)만 일의 자리부터 왼쪽으로, B2~B4 는 앞(높은 자리)부터 오른쪽으로
  *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄(채점하지 않음, 맨 아래 답만 채점)
+ *   - 소수(dec, D1~D5): 숫자판에 소수점(.) 키. 빈 칸에서 누르면 '0.' 이 된다. 값이 같으면 정답(6.0 · 1.20 도 정답,
+ *     대신 '끝자리 0은 지워요' 안내 — 선생님 결정 2026-11-18). D1~D4 도움 칸: '자연수처럼 곱하면 □ → 소수점 아래 □자리'
  * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
  */
 const NumInput = (() => {
 let level, cfg, prob, boxes, cur, waiting, marks, helpOn = false;
 /* 도움 칸이 있는 레벨 — 기본은 꺼 두고 학생이 켠다(선생님 결정 2026-11-17 B1). 켜 두면 그 판 동안 유지 */
-const HELP = { B4: '부분곱 칸', B9: '짝 찾기 칸' };
+const HELP = { B4: '부분곱 칸', B9: '짝 찾기 칸', D1: '자릿수 도움 칸', D2: '자릿수 도움 칸', D3: '자릿수 도움 칸', D4: '자릿수 도움 칸' };
 
 function init(lv, mode, config, onExit) {
   level = lv; cfg = config; helpOn = false;
@@ -43,6 +45,7 @@ function makeBoxes() {
       for (let d = 0; d < String(f.ans).length; d++) out.push({ f: i, v: '', k: 'd' });
       return;
     }
+    if (f.dec && helpOn && HELP[level]) for (let r = 0; r < 2; r++) out.push({ f: i, v: '', k: 'opt' });
     const n = f.list && !f.grow ? f.ans.length : (f.grow && pairs() ? 2 : 1);
     for (let k = 0; k < n; k++) out.push({ f: i, v: '', k: 'n' });
   });
@@ -59,6 +62,9 @@ const fieldOf = b => prob.fields[boxes[b].f];
 const isGrow = b => !!fieldOf(b).grow;
 const isQR = () => prob.fields.length === 2 && prob.fields[0].label === '몫';
 const isAuto = () => prob.fields.length === 1 && !!prob.fields[0].auto;
+const isDec = () => prob.fields.some(f => f.dec);
+/** '으로/로' — 읽었을 때 끝 글자에 ㄹ 아닌 받침이 있으면 '으로' (영·삼·육, 십·백·천). 일·칠·팔(ㄹ)과 받침 없는 수는 '로' */
+const uro = n => /[036]$/.test(String(n)) ? '으로' : '로';
 
 function next() {
   prob = Gen.generateNumProblem(level);
@@ -69,7 +75,7 @@ function next() {
     ${HELP[level] ? `<div class="text-center mb-2"><button type="button" id="numHelp" class="num-help">${helpOn ? '✓ ' : ''}${HELP[level]} ${helpOn ? '끄기' : '켜기'}</button></div>` : ''}
     <div id="numStage"></div>
     <div id="numFb" class="min-h-8 mt-2 text-center font-bold text-lg"></div>
-    ${NumPad.html(isAuto() ? { noGo: true } : {})}`;
+    ${NumPad.html(isAuto() ? { noGo: true } : isDec() ? { extra: '.', extraLabel: '.' } : {})}`;
   NumPad.bind(document.getElementById('numBody'), press);
   const hb = document.getElementById('numHelp');
   if (hb) hb.onclick = toggleHelp;
@@ -82,6 +88,7 @@ function toggleHelp() {
   helpOn = !helpOn;
   const keep = boxes.filter(x => x.k === 'n' && x.v).map(x => x.v);
   const digits = boxes.filter(x => x.k === 'd').map(x => x.v);
+  const nums = boxes.filter(x => x.k === 'n').map(x => x.v);
   boxes = makeBoxes();
   if (level === 'B9') {
     const f = boxes[0].f;
@@ -91,6 +98,7 @@ function toggleHelp() {
     cur = boxes.findIndex(x => !x.v);
   } else {
     boxes.filter(x => x.k === 'd').forEach((x, i) => { x.v = digits[i] || ''; });
+    boxes.filter(x => x.k === 'n').forEach((x, i) => { x.v = nums[i] || ''; });
     cur = firstCur();
   }
   const hb = document.getElementById('numHelp');
@@ -131,6 +139,10 @@ function paint() {
     let rows = '';
     for (let r = 0; r < shown.length; r += 2) rows += `<div class="num-pair">${boxHTML(shown[r])}<span class="q-op">×</span>${shown[r + 1] !== undefined ? boxHTML(shown[r + 1]) : ''}<span class="q-op">= ${n}</span></div>`;
     stage.innerHTML = `<div class="text-center mb-3"><div class="quiz-q num-q">${prob.display}</div></div><div class="num-pairs">${rows}</div>`;
+  } else if (isDec()) {
+    const opts = shown.filter(x => boxes[x].k === 'opt'), ans = shown.find(x => boxes[x].k === 'n');
+    stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(ans)}</div>
+      ${opts.length ? `<div class="num-dhelp">자연수처럼 곱하면 ${boxHTML(opts[0])} <span class="q-op">→</span> 소수점 아래 ${boxHTML(opts[1])}자리</div>` : ''}`;
   } else if (isQR()) {
     stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(0)}<span class="q-op">…</span>${boxHTML(1)}</div>`;
   } else {
@@ -186,6 +198,10 @@ function press(k) {
   if (box.k === 'd' && (k === 'del' || k === '⌫') && !box.v && boxes[cur - dStep()] && boxes[cur - dStep()].k === 'd') {
     cur -= dStep(); boxes[cur].v = ''; return paint();      // 빈 자릿수 칸에서 지우기 = 바로 전에 쓴 칸을 지우고 그리로
   }
+  if (k === '.') {                                        // 소수점: 답 칸에 한 번만. 빈 칸이면 '0.'
+    if (box.k === 'n' && fieldOf(cur).dec && !box.v.includes('.')) box.v = (box.v || '0') + '.';
+    return paint();
+  }
   if (k === 'clear') { if (box.k === 'd') boxes.forEach(x => { if (x.k === 'd') x.v = ''; }); else box.v = ''; if (box.k === 'd') cur = firstCur(); }
   else if (k === 'del' || k === '⌫') {
     if (!box.v && isGrow(cur) && !pairs() && boxes.filter(x => x.f === box.f).length > 1) {   // 빈 약수 칸은 없애고 앞 칸으로
@@ -193,7 +209,7 @@ function press(k) {
     } else box.v = box.v.slice(0, -1);
   } else if (/^\d$/.test(k)) {
     if (box.v === '0') box.v = k;                          // 0 으로 시작하는 수(05)는 만들지 않는다
-    else if (box.v.length < 6) box.v += k;
+    else if (box.v.length < (fieldOf(cur).dec ? 8 : 6)) box.v += k;
     if (isAuto()) { paint(); return submit(); }           // 한 자리 답은 바로 채점
   }
   paint();
@@ -237,7 +253,10 @@ function submit() {
   waiting = true;
   marks = judge();
   const ok = prob.fields.every((f, i) => fieldOK(i));
-  fb.innerHTML = ok ? '<span class="t-ok">정답입니다! ⭕</span>'
+  // 소수 답에 끝자리 0(6.0 · 1.20)이나 끝에 소수점만(6.)을 남겼으면 정답으로 하되 고쳐 쓰는 법을 알려 준다
+  const tail = ok && isDec() && boxes.some(x => x.k === 'n' && /\.(\d*0)?$/.test(x.v));
+  fb.innerHTML = tail ? `<span class="t-ok">정답입니다! ⭕</span><div class="text-base text-gray-700 mt-1">소수 끝자리 0은 지워서 <b>${ansText(prob.fields[0])}</b>${uro(prob.fields[0].ans)} 써요</div>`
+    : ok ? '<span class="t-ok">정답입니다! ⭕</span>'
     : `<span class="t-no">틀렸습니다 ❌</span><div class="text-base text-gray-700 mt-1">정답: ${
         prob.fields.map(f => (f.label ? f.label + ' ' : '') + `<b>${ansText(f)}</b>`).join(' · ')}</div>`;
   paint();
@@ -246,13 +265,14 @@ function submit() {
     if (!done) return next();
     document.getElementById('numBody').innerHTML = Session.finishHTML();
     Session.saveResult();
-  }, ok ? 700 : 2200);
+  }, tail ? 1800 : ok ? 700 : 2200);
 }
 
 /* 키보드 입력 — 풀이 화면이 보일 때만. 쉼표·스페이스·Enter·Tab 은 '다음 칸' */
 document.addEventListener('keydown', e => {
   if (!prob || !document.getElementById('numStage')) return;
   if (/^\d$/.test(e.key)) press(e.key);
+  else if (e.key === '.') { e.preventDefault(); press('.'); }
   else if (e.key === ',' || e.key === ' ') { e.preventDefault(); press(','); }
   else if (e.key === 'Backspace') { e.preventDefault(); press('⌫'); }
   else if (e.key === 'Enter') { e.preventDefault(); press('go'); }

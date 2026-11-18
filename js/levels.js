@@ -1,7 +1,10 @@
 /* levels.js — 레벨 정의 · 잠금 규칙 · 점수 계산
- * 트랙 두 개:
+ * 트랙:
  *   기초 연산 B1~B10 — 숫자를 직접 써넣는다. 항상 열려 있다(앞 레벨을 통과하지 않아도 도전 가능).
  *   분수·소수 L1~L36 + L9-2 (37레벨) — 앞 레벨을 통과해야 다음 레벨 도전이 열린다.
+ *   소수의 곱셈 D1~D6 — 앞 레벨을 통과해야 열린다(선생님 결정 2026-11-18). D1~D5 숫자 직접 입력, D6 4지선다.
+ *     분수·소수 트랙 끝이나 중간에 붙이지 않고 따로 둔다 — 기존 잠금·만점·기록을 건드리지 않으려고.
+ *     랭킹·학생 비교에는 넣지 않는다(db.js levelWeight 가 LEVEL_ORDER 만 센다).
  */
 
 /** 분수·소수 트랙의 순서. 잠금·랭킹의 '최고 레벨'이 이 순서를 쓴다. (이름은 예전 그대로 둔다) */
@@ -19,12 +22,16 @@ const BASIC_LINES = Object.freeze({
 });
 const BASIC_ORDER = [].concat(BASIC_LINES.sub, BASIC_LINES.mul, BASIC_LINES.div, BASIC_LINES.fm);
 
+/** 소수의 곱셈 트랙 (5-2 4단원 순서) */
+const DMUL_ORDER = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
+
 /** 트랙 — 화면에 보이는 순서대로. open: true 면 레벨이 모두 항상 열려 있다 */
 const TRACKS = Object.freeze({
   basic: { label: '기초 연산', levels: BASIC_ORDER, open: true },
-  frac:  { label: '분수 · 소수', levels: LEVEL_ORDER, open: false }
+  frac:  { label: '분수 · 소수', levels: LEVEL_ORDER, open: false },
+  dmul:  { label: '소수의 곱셈', levels: DMUL_ORDER, open: false }
 });
-const TRACK_KEYS = ['basic', 'frac'];
+const TRACK_KEYS = ['basic', 'frac', 'dmul'];
 /** 모든 레벨 (트랙 순서대로) */
 const ALL_LEVELS = [].concat(...TRACK_KEYS.map(k => TRACKS[k].levels));
 
@@ -57,7 +64,9 @@ const LEVEL_MAX = Object.freeze({
   'L23': 200, 'L24': 205, 'L25': 210, 'L26': 215, 'L27': 220,
   'L28': 225, 'L29': 230, 'L30': 235, 'L31': 240, 'L32': 245, 'L33': 250, 'L34': 255, 'L35': 260, 'L36': 265,
   // 기초 연산 — 결과 화면에 보이는 점수만. 랭킹 합계에는 넣지 않는다(db.js getRanking 은 LEVEL_ORDER 레벨만 더함)
-  'B1': 100, 'B2': 100, 'B3': 100, 'B4': 100, 'B5': 100, 'B6': 100, 'B7': 100, 'B8': 100, 'B9': 100, 'B10': 100
+  'B1': 100, 'B2': 100, 'B3': 100, 'B4': 100, 'B5': 100, 'B6': 100, 'B7': 100, 'B8': 100, 'B9': 100, 'B10': 100,
+  // 소수의 곱셈 — 기초와 같이 100점, 랭킹 합계에 넣지 않는다
+  'D1': 100, 'D2': 100, 'D3': 100, 'D4': 100, 'D5': 100, 'D6': 100
 });
 
 /** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
@@ -76,7 +85,9 @@ const GROUP_LABELS = {
   'b-sub': '➖ 뺄셈',
   'b-mul': '✖️ 곱셈',
   'b-div': '➗ 나눗셈',
-  'b-fm':  '🔢 약수와 배수'
+  'b-fm':  '🔢 약수와 배수',
+  'd-mul': '✖️ 소수의 곱셈',
+  'd-mix': '🎯 소수의 곱셈 — 빠르게 풀기'
 };
 
 /* 제한시간 = 문제 수 × 유형별 단가(초)
@@ -235,13 +246,33 @@ const LEVEL_CONFIGS = {
          label:'대분수 × 대분수 계산하기', desc:'4지선다로 빠르게 풀기 — 자연수끼리 · 분수끼리 곱하면 안 돼요',
          theme:{bg:'bg-purple-50', border:'border-purple-300', hbg:'hover:bg-purple-100', lbl:'text-purple-900', descCls:'text-purple-700'} }
 };
-Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS);
+
+/* 소수의 곱셈 — D1~D5 는 숫자 직접 입력(소수점 키), D6 는 4지선다(소수점 위치를 잘못 찍은 보기).
+ * 제한시간 단가: 소수 × 자연수 25초 · 소수 × 소수 35초 · 자릿수 다른 소수 × 소수 50초 · 소수점 옮기기 15초 · 4지선다 20초
+ * 통과는 분수·소수 트랙과 같은 '최근 문제 창'(20문제 중 18개 · 10문제 레벨은 10문제 중 9개) */
+const DTHEME = {bg:'bg-sky-50', border:'border-sky-200', hbg:'hover:bg-sky-100', lbl:'text-sky-800', descCls:'text-sky-600'};
+const DMUL_CONFIGS = {
+  D1: { group:'d-mul', engine:'num', type:'d-mul-dn', chalQ:20, chalTime:T(20,25),
+        label:'(소수) × (자연수)', desc:'자연수처럼 곱하고, 곱하는 소수의 자릿수만큼 소수점을 찍어요', theme:DTHEME },
+  D2: { group:'d-mul', engine:'num', type:'d-mul-nd', chalQ:20, chalTime:T(20,25),
+        label:'(자연수) × (소수)', desc:'자연수처럼 곱하고, 소수의 자릿수만큼 소수점을 찍어요', theme:DTHEME },
+  D3: { group:'d-mul', engine:'num', type:'d-mul-11', chalQ:20, chalTime:T(20,35),
+        label:'(소수) × (소수)', desc:'소수 한 자리 × 소수 한 자리 = 소수 두 자리 — 자리가 모자라면 앞에 0을 채워요', theme:DTHEME },
+  D4: { group:'d-mul', engine:'num', type:'d-mul-21', chalQ:10, chalTime:T(10,50),
+        label:'자릿수가 다른 소수의 곱셈', desc:'두 소수의 소수점 아래 자릿수를 더한 만큼 소수점을 찍어요', theme:DTHEME },
+  D5: { group:'d-mul', engine:'num', type:'d-mul-shift', chalQ:20, chalTime:T(20,15),
+        label:'곱의 소수점 위치', desc:'× 10 · 100 · 1000 은 오른쪽으로, × 0.1 · 0.01 · 0.001 은 왼쪽으로', theme:DTHEME },
+  D6: { group:'d-mix', engine:'choice', type:'dec-mul', chalQ:20, chalTime:T(20,20),
+        label:'소수의 곱셈 계산하기', desc:'4지선다로 빠르게 풀기 — 소수점 위치가 다른 보기를 조심해요', theme:DTHEME }
+};
+Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS, DMUL_CONFIGS);
 
 /** 계산 연습장(js/scratch.js)을 붙이는 레벨 — 중간 계산을 종이에 적어야 하는데 화면이 대신 보여 주지 않는 레벨.
  *  선생님 승인 2026-11-17: '필요' 20개. 단계 풀이(과정형)는 풀이판이 중간값을 채워 주므로 넣지 않았다.
  *  B5(구구 나눗셈)·그림·자리 옮기기·동분모처럼 암산으로 되는 레벨도 뺐다. */
 const SCRATCH_LEVELS = ['B1', 'B2', 'B3', 'B4', 'B6', 'B7', 'B8', 'B9', 'B10',
-                        'L9', 'L10', 'L12', 'L14', 'L16', 'L18', 'L21', 'L22', 'L27', 'L32', 'L36'];
+                        'L9', 'L10', 'L12', 'L14', 'L16', 'L18', 'L21', 'L22', 'L27', 'L32', 'L36',
+                        'D1', 'D2', 'D3', 'D4', 'D6'];   // 소수의 곱셈(2026-11-18): D5 는 소수점만 옮기면 되어 뺐다
 SCRATCH_LEVELS.forEach(lv => { LEVEL_CONFIGS[lv].scratch = true; });
 
 /* ═══ 잠금 ═══
@@ -443,7 +474,7 @@ function formatBasicStart(map) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
+  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
   trackOf, prevInTrack, nextInTrack, isRunRule, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
