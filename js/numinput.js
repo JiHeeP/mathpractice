@@ -13,6 +13,7 @@
  *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄(채점하지 않음, 맨 아래 답만 채점)
  *   - 소수(dec, D1~D5): 숫자판에 소수점(.) 키. 빈 칸에서 누르면 '0.' 이 된다. 값이 같으면 정답(6.0 · 1.20 도 정답,
  *     대신 '끝자리 0은 지워요' 안내 — 선생님 결정 2026-11-18). D1~D4 도움 칸: '자연수처럼 곱하면 □ → 소수점 아래 □자리'
+ *   - 넓이(unit, A1~A6): 위에 도형 그림, 아래 '넓이 = □ cm²'. 단위는 미리 적혀 있고 숫자만 쓴다
  * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
  */
@@ -143,6 +144,9 @@ function paint() {
     const opts = shown.filter(x => boxes[x].k === 'opt'), ans = shown.find(x => boxes[x].k === 'n');
     stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(ans)}</div>
       ${opts.length ? `<div class="num-dhelp">자연수처럼 곱하면 ${boxHTML(opts[0])} <span class="q-op">→</span> 소수점 아래 ${boxHTML(opts[1])}자리</div>` : ''}`;
+  } else if (prob.fields.length === 1 && prob.fields[0].unit) {
+    stage.innerHTML = `<div class="text-center mb-2">${prob.display}</div>
+      <div class="quiz-q num-q num-line num-area">넓이<span class="q-op">=</span>${boxHTML(0)}<span class="num-unit">${prob.fields[0].unit}</span></div>`;
   } else if (isQR()) {
     stage.innerHTML = `<div class="quiz-q num-q num-line">${prob.display}${boxHTML(0)}<span class="q-op">…</span>${boxHTML(1)}</div>`;
   } else {
@@ -234,7 +238,7 @@ function fieldOK(fi) {
   const want = f.ans.slice().sort((a, b) => a - b), g = got.slice().sort((a, b) => a - b);
   return g.length === want.length && g.every((x, i) => x === want[i]);
 }
-const ansText = f => f.list ? f.ans.join(', ') : String(f.ans);
+const ansText = f => (f.list ? f.ans.join(', ') : String(f.ans)) + (f.unit ? ' ' + f.unit : '');
 
 function submit() {
   // 꼭 채워야 할 칸이 비었으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)

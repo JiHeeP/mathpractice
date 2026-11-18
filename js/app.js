@@ -416,7 +416,7 @@ function exampleHTML(lv, cfg) {
   if (cfg.engine === 'num') {
     try {
       const q = Gen.generateNumProblem(lv);
-      const ans = q.fields.map(f => (f.label ? f.label + ' ' : '') + (f.list ? f.ans.join(', ') : f.ans)).join(' · ');
+      const ans = q.fields.map(f => (f.label ? f.label + ' ' : '') + (f.list ? f.ans.join(', ') : f.ans) + (f.unit ? ' ' + f.unit : '')).join(' · ');
       return `<div class="ex-box"><span class="ex-lbl">예시</span><div class="quiz-q num-q">${q.display}</div>
         <div class="ex-ans">정답 ➜ ${ans}</div></div>`;
     } catch (e) { return ''; }

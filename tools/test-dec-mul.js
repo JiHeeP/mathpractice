@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 const ctx = { console, Math, JSON, Object, Array, String, Number, Error, Set };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['js/fraction.js', 'js/decimal.js', 'js/pictures.js', 'js/levels.js', 'js/generator.js']) {
+for (const f of ['js/fraction.js', 'js/decimal.js', 'js/pictures.js', 'js/shapes.js', 'js/levels.js', 'js/generator.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 }
 const L = ctx.Levels, G = ctx.Gen;
@@ -17,7 +17,7 @@ let fails = 0;
 const check = (name, cond) => { console.log((cond ? '  ✔ ' : '  ✘ ') + name); if (!cond) fails++; };
 
 console.log('트랙 · 잠금');
-check('소수의 곱셈 트랙 D1~D6', L.TRACKS.dmul.levels.join() === 'D1,D2,D3,D4,D5,D6' && L.TRACK_KEYS.join() === 'basic,frac,dmul');
+check('소수의 곱셈 트랙 D1~D6', L.TRACKS.dmul.levels.join() === 'D1,D2,D3,D4,D5,D6' && L.TRACK_KEYS.slice(0, 3).join() === 'basic,frac,dmul');
 check('D1 은 처음부터 열림', L.isLevelUnlocked('D1', {}));
 check('D2~D6 은 앞 레벨을 통과해야 열림', ['D2','D3','D4','D5','D6'].every((lv, i) => {
   const prev = 'D' + (i + 1);

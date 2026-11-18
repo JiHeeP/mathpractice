@@ -5,6 +5,7 @@
  *   소수의 곱셈 D1~D6 — 앞 레벨을 통과해야 열린다(선생님 결정 2026-11-18). D1~D5 숫자 직접 입력, D6 4지선다.
  *     분수·소수 트랙 끝이나 중간에 붙이지 않고 따로 둔다 — 기존 잠금·만점·기록을 건드리지 않으려고.
  *     랭킹·학생 비교에는 넣지 않는다(db.js levelWeight 가 LEVEL_ORDER 만 센다).
+ *   도형의 넓이 A1~A6 — 소수의 곱셈과 같은 규칙(앞 레벨 통과해야 열림). 그림(js/shapes.js)을 보고 넓이를 숫자로 쓴다.
  */
 
 /** 분수·소수 트랙의 순서. 잠금·랭킹의 '최고 레벨'이 이 순서를 쓴다. (이름은 예전 그대로 둔다) */
@@ -24,14 +25,17 @@ const BASIC_ORDER = [].concat(BASIC_LINES.sub, BASIC_LINES.mul, BASIC_LINES.div,
 
 /** 소수의 곱셈 트랙 (5-2 4단원 순서) */
 const DMUL_ORDER = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
+/** 도형의 넓이 트랙 (5-1 6단원 순서) */
+const AREA_ORDER = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
 
 /** 트랙 — 화면에 보이는 순서대로. open: true 면 레벨이 모두 항상 열려 있다 */
 const TRACKS = Object.freeze({
   basic: { label: '기초 연산', levels: BASIC_ORDER, open: true },
   frac:  { label: '분수 · 소수', levels: LEVEL_ORDER, open: false },
-  dmul:  { label: '소수의 곱셈', levels: DMUL_ORDER, open: false }
+  dmul:  { label: '소수의 곱셈', levels: DMUL_ORDER, open: false },
+  area:  { label: '도형의 넓이', levels: AREA_ORDER, open: false }
 });
-const TRACK_KEYS = ['basic', 'frac', 'dmul'];
+const TRACK_KEYS = ['basic', 'frac', 'dmul', 'area'];
 /** 모든 레벨 (트랙 순서대로) */
 const ALL_LEVELS = [].concat(...TRACK_KEYS.map(k => TRACKS[k].levels));
 
@@ -66,7 +70,9 @@ const LEVEL_MAX = Object.freeze({
   // 기초 연산 — 결과 화면에 보이는 점수만. 랭킹 합계에는 넣지 않는다(db.js getRanking 은 LEVEL_ORDER 레벨만 더함)
   'B1': 100, 'B2': 100, 'B3': 100, 'B4': 100, 'B5': 100, 'B6': 100, 'B7': 100, 'B8': 100, 'B9': 100, 'B10': 100,
   // 소수의 곱셈 — 기초와 같이 100점, 랭킹 합계에 넣지 않는다
-  'D1': 100, 'D2': 100, 'D3': 100, 'D4': 100, 'D5': 100, 'D6': 100
+  'D1': 100, 'D2': 100, 'D3': 100, 'D4': 100, 'D5': 100, 'D6': 100,
+  // 도형의 넓이 — 같은 방식
+  'A1': 100, 'A2': 100, 'A3': 100, 'A4': 100, 'A5': 100, 'A6': 100
 });
 
 /** 점수가 기록되지 않는 모드 — 'aborted' 는 도전을 끝까지 풀지 않고 그만둔 경우 */
@@ -87,7 +93,9 @@ const GROUP_LABELS = {
   'b-div': '➗ 나눗셈',
   'b-fm':  '🔢 약수와 배수',
   'd-mul': '✖️ 소수의 곱셈',
-  'd-mix': '🎯 소수의 곱셈 — 빠르게 풀기'
+  'd-mix': '🎯 소수의 곱셈 — 빠르게 풀기',
+  'a-area': '📐 도형의 넓이',
+  'a-mix':  '🎯 도형의 넓이 — 섞어서'
 };
 
 /* 제한시간 = 문제 수 × 유형별 단가(초)
@@ -265,14 +273,33 @@ const DMUL_CONFIGS = {
   D6: { group:'d-mix', engine:'choice', type:'dec-mul', chalQ:20, chalTime:T(20,20),
         label:'소수의 곱셈 계산하기', desc:'4지선다로 빠르게 풀기 — 소수점 위치가 다른 보기를 조심해요', theme:DTHEME }
 };
-Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS, DMUL_CONFIGS);
+
+/* 도형의 넓이 — 모두 숫자 직접 입력. 그림에 길이가 적혀 있고, 단위(cm² · m²)는 답 칸 옆에 미리 적어 둔다(선생님 결정 2026-11-18).
+ * 제한시간 단가: 직사각형 25초 · 평행사변형~사다리꼴 40초 · 섞어서 45초 */
+const ATHEME = {bg:'bg-teal-50', border:'border-teal-200', hbg:'hover:bg-teal-100', lbl:'text-teal-800', descCls:'text-teal-600'};
+const AREA_CONFIGS = {
+  A1: { group:'a-area', engine:'num', type:'a-rect',  chalQ:20, chalTime:T(20,25),
+        label:'직사각형 · 정사각형의 넓이', desc:'(가로) × (세로) · 정사각형은 (한 변) × (한 변)', theme:ATHEME },
+  A2: { group:'a-area', engine:'num', type:'a-para',  chalQ:20, chalTime:T(20,40),
+        label:'평행사변형의 넓이', desc:'(밑변) × (높이) — 높이는 밑변과 수직인 점선이에요', theme:ATHEME },
+  A3: { group:'a-area', engine:'num', type:'a-tri',   chalQ:20, chalTime:T(20,40),
+        label:'삼각형의 넓이', desc:'(밑변) × (높이) ÷ 2 — 높이가 삼각형 밖에 있을 때도 있어요', theme:ATHEME },
+  A4: { group:'a-area', engine:'num', type:'a-rhom',  chalQ:20, chalTime:T(20,40),
+        label:'마름모의 넓이', desc:'(한 대각선) × (다른 대각선) ÷ 2', theme:ATHEME },
+  A5: { group:'a-area', engine:'num', type:'a-trap',  chalQ:20, chalTime:T(20,40),
+        label:'사다리꼴의 넓이', desc:'(윗변 + 아랫변) × (높이) ÷ 2', theme:ATHEME },
+  A6: { group:'a-mix',  engine:'num', type:'a-mix',   chalQ:20, chalTime:T(20,45),
+        label:'여러 가지 도형의 넓이', desc:'모양을 보고 알맞은 방법을 골라 넓이를 구해요', theme:ATHEME }
+};
+Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS, DMUL_CONFIGS, AREA_CONFIGS);
 
 /** 계산 연습장(js/scratch.js)을 붙이는 레벨 — 중간 계산을 종이에 적어야 하는데 화면이 대신 보여 주지 않는 레벨.
  *  선생님 승인 2026-11-17: '필요' 20개. 단계 풀이(과정형)는 풀이판이 중간값을 채워 주므로 넣지 않았다.
  *  B5(구구 나눗셈)·그림·자리 옮기기·동분모처럼 암산으로 되는 레벨도 뺐다. */
 const SCRATCH_LEVELS = ['B1', 'B2', 'B3', 'B4', 'B6', 'B7', 'B8', 'B9', 'B10',
                         'L9', 'L10', 'L12', 'L14', 'L16', 'L18', 'L21', 'L22', 'L27', 'L32', 'L36',
-                        'D1', 'D2', 'D3', 'D4', 'D6'];   // 소수의 곱셈(2026-11-18): D5 는 소수점만 옮기면 되어 뺐다
+                        'D1', 'D2', 'D3', 'D4', 'D6',    // 소수의 곱셈(2026-11-18): D5 는 소수점만 옮기면 되어 뺐다
+                        'A2', 'A3', 'A4', 'A5', 'A6'];   // 도형의 넓이(2026-11-18): A1 은 곱셈 한 번이라 뺐다
 SCRATCH_LEVELS.forEach(lv => { LEVEL_CONFIGS[lv].scratch = true; });
 
 /* ═══ 잠금 ═══
@@ -474,7 +501,7 @@ function formatBasicStart(map) {
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
-  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
+  LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
   trackOf, prevInTrack, nextInTrack, isRunRule, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
