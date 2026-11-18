@@ -62,7 +62,7 @@ const Update = (() => {
   return { start, check, takeResume };
 })();
 let resumeNo = null;
-const titleFor = no => `${no}번 · 연산 마스터`;
+const titleFor = no => `${no}번 · 5학년 수학 연산`;
 
 const remember = {
   get() { try { return localStorage.getItem('mp.lastClass') || ''; } catch (e) { return ''; } },
@@ -104,7 +104,7 @@ function boot() {
 function showClassEntry(msg) {
   only('classEntry');
   $('classBadge').classList.add('hidden');
-  $('gameTitle').textContent = '분수 연산 마스터';
+  $('gameTitle').textContent = '5학년 수학 연산';
   $('classCodeMessage').textContent = msg || '';
   $('classCodeInput').value = '';
   $('classCodeInput').focus();
@@ -217,7 +217,7 @@ function submitStudentPin() {
 
 function backToStudents() {
   resetStudent();
-  $('gameTitle').textContent = '분수 연산 마스터';
+  $('gameTitle').textContent = '5학년 수학 연산';
   const go = $('goToPinBtn');
   go.disabled = true; go.classList.replace('btn-main','bg-gray-300');
   loadStudents('');

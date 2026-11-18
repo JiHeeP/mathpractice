@@ -1,6 +1,6 @@
 /* build-single-file.js — CSS·JS를 전부 집어넣은 HTML 한 개를 만든다.
  *
- *   node tools/build-single-file.js              → dist/분수연산마스터.html
+ *   node tools/build-single-file.js              → dist/5학년수학연산.html
  *   node tools/build-single-file.js --fragment   → dist/preview-fragment.html
  *
  * 만들어진 파일은 서버 없이 브라우저로 바로 열 수 있다(USB로 나눠 주기 좋음).
@@ -39,7 +39,7 @@ const groundCSS = `
 html, body { background: #fffbeb; margin: 0; }
 .app-shell { min-height: 100vh; }`;
 
-const head = `<title>분수 연산 마스터</title>
+const head = `<title>5학년 수학 연산</title>
 <style>${styles}</style>
 <style>${groundCSS}</style>`;
 
@@ -62,6 +62,6 @@ ${shell}
 `;
 
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
-const file = fragment ? 'dist/preview-fragment.html' : 'dist/분수연산마스터.html';
+const file = fragment ? 'dist/preview-fragment.html' : 'dist/5학년수학연산.html';
 fs.writeFileSync(path.join(ROOT, file), out);
 console.log(`${file} — ${(Buffer.byteLength(out) / 1024).toFixed(0)}KB`);
