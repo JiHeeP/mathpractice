@@ -758,7 +758,7 @@ function genSub3() {
     const a = randInt(200, 999), b = randInt(100, a - 1);
     const borrowOnes = (a % 10) < (b % 10);
     const borrowTens = (Math.floor(a / 10) % 10) - (borrowOnes ? 1 : 0) < (Math.floor(b / 10) % 10);
-    if ((borrowOnes || borrowTens) && a - b >= 10) return vertOne(a, '−', b, a - b);
+    if ((borrowOnes || borrowTens) && a - b >= 10) { const p = vertOne(a, '−', b, a - b); p.fields[0].vert.rtl = true; return p; }   // B1만 일의 자리부터
   }
 }
 function genMul1() {   // (두·세 자리) × (한 자리)

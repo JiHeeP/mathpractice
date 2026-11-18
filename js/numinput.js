@@ -8,7 +8,8 @@
  *     빈 칸에서 '확인'. 빈 칸에서 지우기를 누르면 그 칸이 없어지고 앞 칸으로 간다
  *   - 배수·공배수(list): 문제에 나온 개수만큼 칸을 미리 보여 준다(개수는 문제에 이미 있다)
  *   - 한 자리 답(auto, B5): 숫자 하나를 누르면 바로 채점한다(확인 키 없음)
- *   - 세로셈(vert, B1~B4): 문제를 세로로 쓰고, 답은 자릿수 칸에 일의 자리부터 왼쪽으로 채운다
+ *   - 세로셈(vert, B1~B4): 문제를 세로로 쓰고, 답은 자릿수 칸에 채운다.
+ *     B1(뺄셈, vert.rtl)만 일의 자리부터 왼쪽으로, B2~B4 는 앞(높은 자리)부터 오른쪽으로
  *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄(채점하지 않음, 맨 아래 답만 채점)
  * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
@@ -48,8 +49,12 @@ function makeBoxes() {
   return out;
 }
 const pairs = () => helpOn && level === 'B9';             // 약수 짝 줄
+const rtl = () => !!(prob.fields[0].vert && prob.fields[0].vert.rtl);   // 자릿수 칸을 일의 자리부터(B1)
+const dStep = () => rtl() ? -1 : 1;                                     // 숫자를 쓰면 옮겨 갈 방향
 const firstCur = () => { const d = boxes.findIndex(x => x.k === 'opt'); if (d !== -1) return d;
-  const ds = boxes.map((x, b) => b).filter(b => boxes[b].k === 'd'); return ds.length ? ds[ds.length - 1] : 0; };
+  const ds = boxes.map((x, b) => b).filter(b => boxes[b].k === 'd'); return ds.length ? (rtl() ? ds[ds.length - 1] : ds[0]) : 0; };
+const firstEmptyDigit = () => { const ds = boxes.map((x, b) => b).filter(b => boxes[b].k === 'd' && !boxes[b].v);
+  return ds.length ? (rtl() ? ds[ds.length - 1] : ds[0]) : -1; };
 const fieldOf = b => prob.fields[boxes[b].f];
 const isGrow = b => !!fieldOf(b).grow;
 const isQR = () => prob.fields.length === 2 && prob.fields[0].label === '몫';
@@ -139,12 +144,13 @@ function paint() {
 /** '다음 칸'을 누르면 갈 곳 — 칸 번호, 'new'(약수 칸 하나 더), null(남은 칸이 없으니 확인) */
 function target() {
   const need = b => !isGrow(b) && boxes[b].k !== 'opt' && !boxes[b].v;   // 꼭 채워야 하는 빈 칸
-  if (boxes[cur].k === 'opt') {                             // 도움 칸 → 다음 도움 칸 → 답의 일의 자리
+  if (boxes[cur].k === 'opt') {                             // 도움 칸 → 다음 도움 칸 → 답의 첫 빈 자릿수 칸
     if (boxes[cur + 1] && boxes[cur + 1].k === 'opt') return cur + 1;
-    for (let b = boxes.length - 1; b >= 0; b--) if (boxes[b].k === 'd' && !boxes[b].v) return b;
+    const e = firstEmptyDigit(); if (e !== -1) return e;
   }
-  if (boxes[cur].k === 'd') {                               // 자릿수 칸은 왼쪽으로
-    for (let b = cur - 1; b >= 0 && boxes[b].k === 'd'; b--) if (!boxes[b].v) return b;
+  if (boxes[cur].k === 'd') {                               // 자릿수 칸은 쓰는 방향으로(B1 왼쪽, 나머지 오른쪽)
+    for (let b = cur + dStep(); boxes[b] && boxes[b].k === 'd'; b += dStep()) if (!boxes[b].v) return b;
+    const e = firstEmptyDigit(); if (e !== -1) return e;
   }
   for (let b = cur + 1; b < boxes.length; b++) if (need(b)) return b;
   if (isGrow(cur) && boxes[cur].v) {
@@ -172,13 +178,13 @@ function press(k) {
     else cur = t;
     return paint();
   }
-  if (box.k === 'd' && /^\d$/.test(k)) {                  // 자릿수 칸: 한 칸에 숫자 하나, 쓰면 왼쪽 칸으로
+  if (box.k === 'd' && /^\d$/.test(k)) {                  // 자릿수 칸: 한 칸에 숫자 하나, 쓰면 다음 칸으로
     box.v = k;
-    if (boxes[cur - 1] && boxes[cur - 1].k === 'd') cur--;
+    if (boxes[cur + dStep()] && boxes[cur + dStep()].k === 'd') cur += dStep();
     return paint();
   }
-  if (box.k === 'd' && (k === 'del' || k === '⌫') && !box.v && boxes[cur + 1] && boxes[cur + 1].k === 'd') {
-    cur++; boxes[cur].v = ''; return paint();               // 빈 자릿수 칸에서 지우기 = 오른쪽 칸을 지우고 그리로
+  if (box.k === 'd' && (k === 'del' || k === '⌫') && !box.v && boxes[cur - dStep()] && boxes[cur - dStep()].k === 'd') {
+    cur -= dStep(); boxes[cur].v = ''; return paint();      // 빈 자릿수 칸에서 지우기 = 바로 전에 쓴 칸을 지우고 그리로
   }
   if (k === 'clear') { if (box.k === 'd') boxes.forEach(x => { if (x.k === 'd') x.v = ''; }); else box.v = ''; if (box.k === 'd') cur = firstCur(); }
   else if (k === 'del' || k === '⌫') {
