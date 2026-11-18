@@ -707,7 +707,8 @@ const CHOICE_GENS = {
   'nat-mul-frac':  () => fracMulNatQuestion(genFracMulNat(true)),
   'nat-mul-mixed': () => mixedMulNatQuestion(genMixedMulNat('mixed-mul-nat', true)),
   'frac-mul-frac': () => fracMulFracQuestion(genFracMulFrac()),
-  'mixed-mul-mixed': () => mixedMulMixedQuestion(genMixedMulMixed())
+  'mixed-mul-mixed': () => mixedMulMixedQuestion(genMixedMulMixed()),
+  'dec-mul':       decMulQuestion
 };
 
 function generateChoiceSet(level, count) {
@@ -802,10 +803,87 @@ function genMultiples() {
   if (kind === 'common') return { display: `<span>${a}${window.Frac.josa(a, '과', '와')} ${b}의 공배수를 작은 수부터 3개 쓰세요</span>`, fields: [{ label: '', ans: [m, 2 * m, 3 * m], list: true }] };
   return { display: `<span>${a}${window.Frac.josa(a, '과', '와')} ${b}의 최소공배수는?</span>`, fields: [{ label: '', ans: m }] };
 }
+/* ═══════════ 소수의 곱셈 D1~D6 ═══════════
+ * 소수를 { v: 정수값, p: 소수점 아래 자릿수 } 로 다룬다(decimal.js) — 부동소수점 오차 없음.
+ * 숫자 입력 문제 = { display, fields: [{ label:'', ans: 숫자, dec: true, raw, places }] }
+ *   ans    : 정답(끝자리 0을 지운 값). 학생이 6.0 · 1.20 처럼 써도 값이 같으면 정답(선생님 결정 2026-11-18)
+ *   raw/places : 자연수처럼 곱한 값 · 소수점 아래 자릿수 — 도움 칸 정답 안내용(채점 안 함)
+ */
+/** 끝자리가 0이 아닌 p자리 소수, 정수 부분은 0 ~ maxWhole */
+function decP(p, maxWhole, minV) {
+  for (;;) { const v = randInt(minV || 1, (maxWhole + 1) * Math.pow(10, p) - 1); if (v % 10) return D(v, p); }
+}
+const mulD = (a, b) => D(a.v * b.v, a.p + b.p);
+const decField = (A, B, aFirst) => {
+  const r = mulD(A, B), x = aFirst ? A : B, y = aFirst ? B : A;
+  return { display: opHTML(textD(x), '×', textD(y)),
+    fields: [{ label: '', ans: Number(textD(r)), dec: true, raw: r.v, places: r.p }], A: x, B: y, r };
+};
+/** D1·D2 — (소수) × (자연수). 소수 한 자리가 대부분, 두 자리도 섞는다. 답이 자연수가 되면 다시 */
+function genDecNat(natFirst) {
+  for (;;) {
+    const p = Math.random() < 0.75 ? 1 : 2;
+    const A = decP(p, p === 1 ? 9 : 5);
+    const n = (p === 1 && Math.random() < 0.2) ? randInt(11, 25) : randInt(2, 9);
+    const q = decField(A, D(n, 0), !natFirst);
+    if (normD(q.r).p > 0) return q;
+  }
+}
+/** D3 — (소수 한 자리) × (소수 한 자리). 약 10%는 0.2 × 0.3 = 0.06 처럼 소수점 뒤에 0을 채우는 답 */
+function genDec11() {
+  if (Math.random() < 0.1) {
+    for (;;) { const a = randInt(2, 9), b = randInt(1, 4); if (a * b < 10) return decField(D(a, 1), D(b, 1), Math.random() < 0.5); }
+  }
+  for (;;) {
+    const A = Math.random() < 0.3 ? decP(1, 0) : decP(1, 9, 11);
+    const B = Math.random() < 0.3 ? decP(1, 0) : decP(1, 5, 11);
+    const q = decField(A, B, Math.random() < 0.5);
+    if (normD(q.r).p > 0) return q;
+  }
+}
+/** D4 — (소수 두 자리) × (소수 한 자리). 예: 1.25 × 0.4, 0.36 × 2.5 */
+function genDec21() {
+  for (;;) {
+    const A = decP(2, 5, 11), B = decP(1, 4, 2);
+    const q = decField(A, B, Math.random() < 0.6);
+    if (normD(q.r).p > 0) return q;
+  }
+}
+/** D5 — × 10 · 100 · 1000 / × 0.1 · 0.01 · 0.001. 답은 소수점 아래 세 자리까지 */
+function genDecShift() {
+  for (;;) {
+    let A, M;
+    if (Math.random() < 0.5) {
+      A = decP(randInt(1, 3), 99); M = D(pick([10, 100, 1000]), 0);
+    } else {
+      A = Math.random() < 0.5 ? D(nonRound(2, 999), 0) : decP(1, 99);
+      M = D(1, pick([1, 2, 3]));
+    }
+    const r = mulD(A, M);
+    if (normD(r).p > 3) continue;
+    return decField(A, M, Math.random() < 0.7);
+  }
+}
+/** D6 — 4지선다. D1~D4 문제 중 하나 + 소수점 위치를 잘못 찍은 보기 */
+function decMulQuestion() {
+  const g = pick([() => genDecNat(false), () => genDecNat(true), genDec11, genDec11, genDec21]);
+  const q = g(), raw = q.r.v, P = q.r.p, ans = textD(q.r);
+  const wrong = [P - 1, P + 1, Math.max(q.A.p, q.B.p), P - 2, P + 2]   // 자릿수 하나 덜/더 · 덧셈처럼 자리 맞춤 · 두 자리 차이
+    .filter(k => k >= 0 && k <= 5).map(k => textD(D(raw, k)));
+  const cands = [...new Set(wrong)].filter(t => t !== ans).map(t => decC(t, false));
+  return {
+    display: eqQ(`<span class="qc-num">${textD(q.A)}</span><span class="q-op">×</span><span class="qc-num">${textD(q.B)}</span>`),
+    choices: finalize(decC(ans, true), cands,
+      () => { const t = textD(D(raw + (randInt(1, 9) * pick([1, -1])) * Math.pow(10, randInt(0, 1)), P)); return t !== ans && !/^-/.test(t) ? decC(t, false) : null; })
+  };
+}
+
 const NUM_GENS = {
   'b-sub3': genSub3, 'b-mul-1': genMul1, 'b-mul-22': genMul22, 'b-mul-32': genMul32,
   'b-div-99': genDiv99, 'b-div-21': genDiv21, 'b-div-31': genDiv31, 'b-div-x2': genDivX2,
-  'b-divisors': genDivisors, 'b-multiples': genMultiples
+  'b-divisors': genDivisors, 'b-multiples': genMultiples,
+  'd-mul-dn': () => genDecNat(false), 'd-mul-nd': () => genDecNat(true), 'd-mul-11': genDec11,
+  'd-mul-21': genDec21, 'd-mul-shift': genDecShift
 };
 
 function generateNumProblem(level) {
