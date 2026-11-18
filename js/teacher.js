@@ -278,8 +278,54 @@ function updateCompareHeaders() {
   hint.innerHTML = parts.join('');
 }
 
-/* ── 기초 연산 통과 현황 (번호 × B1~B10). 기초 기록만 읽는다(DB.getBasicProgress) ── */
+/* ── 트랙 현황 — 위의 단추로 트랙을 고른다. 고른 트랙의 기록만 읽는다(DB.getBasicProgress) ── */
+const GRID_TRACKS = ['basic', 'dmul', 'area'];
+let gridTrack = 'basic';
+function setGridTrack(t) { gridTrack = t; loadBasic(); }
 function loadBasic(force) {
+  $('tGridTracks').innerHTML = GRID_TRACKS.map(t =>
+    `<button class="ttab${t === gridTrack ? ' ttab-on' : ''}" onclick="Teacher.setGridTrack('${t}')">${Levels.TRACKS[t].label}</button>`).join('');
+  $('tBasicLegend').classList.toggle('hidden', gridTrack !== 'basic');
+  $('tTrackLegend').classList.toggle('hidden', gridTrack === 'basic');
+  if (gridTrack === 'basic') return loadBasicGrid(force);
+  return loadTrackGrid(gridTrack, force);
+}
+
+/* 소수의 곱셈 · 도형의 넓이 — 번호 × 레벨. ✓ 통과 · 15/20 최근 문제 창 정답 수 · 테두리 = 지금 할 레벨(열린 레벨 중 통과 못 한 첫 레벨) */
+function loadTrackGrid(track, force) {
+  const L = Levels, code = currentClass.code, levels = L.TRACKS[track].levels;
+  $('tBasicHead').innerHTML = `<tr class="bg-slate-200 text-xs text-slate-800">
+      <th class="px-2 py-2 sticky left-0 bg-slate-200">번호</th>
+      ${levels.map(lv => `<th class="px-1 py-2" title="${L.LEVEL_CONFIGS[lv].label}">${lv}</th>`).join('')}
+      <th class="px-2 py-2 border-l border-slate-300">통과</th></tr>`;
+  const tb = $('tBasicBody'), span = levels.length + 2;
+  tb.innerHTML = `<tr><td colspan="${span}" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>`;
+  Promise.all([DB.getBasicProgress(code, force, track), DB.getStudents(code)]).then(([prog, students]) => {
+    if (gridTrack !== track) return;   // 불러오는 사이에 다른 트랙을 눌렀으면 버린다
+    const nos = [...new Set([...students.map(s => String(s.number)), ...Object.keys(prog)])].sort((a, b) => Number(a) - Number(b));
+    let anyTry = 0, anyPass = 0;
+    tb.innerHTML = nos.map(no => {
+      const p = prog[no] || { passed: {}, recent: {}, solved: {} };
+      const now = levels.find(lv => !p.passed[lv] && L.isLevelUnlocked(lv, p.passed)) || null;
+      const nPass = levels.filter(lv => p.passed[lv]).length;
+      if (prog[no]) anyTry++;
+      if (nPass) anyPass++;
+      const cells = levels.map(lv => {
+        let txt = '', cls = '';
+        if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
+        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.passWindow(lv).size}`; cls = 'bb-try'; }
+        const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
+        return `<td class="bb-cell ${cls}${lv === now && prog[no] ? ' bb-now' : ''}"${tip}>${txt}</td>`;
+      }).join('');
+      return `<tr class="border-b border-slate-100"><td class="px-2 py-2 text-center font-black sticky left-0 bg-white">${no}</td>${cells}
+        <td class="px-2 py-2 text-center font-bold border-l border-slate-200">${nPass}/${levels.length}</td></tr>`;
+    }).join('') || `<tr><td colspan="${span}" class="px-4 py-4 text-center text-gray-500">학생이 없습니다.</td></tr>`;
+    $('tBasicSummary').textContent = `${L.TRACKS[track].label} — 시작한 학생 ${anyTry}명 · 하나라도 통과한 학생 ${anyPass}명`;
+  }).catch(e => { tb.innerHTML = `<tr><td colspan="${span}" class="px-4 py-4 text-center text-red-500">불러오지 못했습니다: ${e.message || e}</td></tr>`; });
+}
+
+/* 기초 연산 통과 현황 (번호 × B1~B10) */
+function loadBasicGrid(force) {
   const L = Levels, code = currentClass.code;
   const lineName = { sub: '뺄셈', mul: '곱셈', div: '나눗셈', fm: '약수·배수' };
   $('tBasicHead').innerHTML = `<tr class="bg-slate-200 text-xs text-slate-800">
@@ -291,6 +337,7 @@ function loadBasic(force) {
   const tb = $('tBasicBody');
   tb.innerHTML = `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>`;
   Promise.all([DB.getBasicProgress(code, force), DB.getStudents(code)]).then(([prog, students]) => {
+    if (gridTrack !== 'basic') return;
     const starts = currentClass.basicStart || {};
     const nos = [...new Set([...students.map(s => String(s.number)), ...Object.keys(starts), ...Object.keys(prog)])]
       .sort((a, b) => Number(a) - Number(b));
@@ -440,6 +487,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, setGridTrack, printCards
 };
 })();
