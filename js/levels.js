@@ -115,7 +115,7 @@ const BASIC_CONFIGS = {
          label:'받아내림 있는 세 자리 뺄셈', desc:'일의 자리부터 — 모자라면 윗자리에서 10을 빌려 와요', theme:BTHEME },
   B2:  { group:'b-mul', engine:'num', type:'b-mul-1',  chalQ:20, chalTime:T(20,20), open:true,
          label:'(두·세 자리) × (한 자리)', desc:'일의 자리부터 곱하고 올림을 더해요', theme:BTHEME },
-  B3:  { group:'b-mul', engine:'num', type:'b-mul-22', chalQ:20, chalTime:T(20,40), open:true,
+  B3:  { group:'b-mul', engine:'num', type:'b-mul-22', chalQ:10, chalTime:T(10,40), open:true,
          label:'(두 자리) × (두 자리)', desc:'일의 자리 곱 + 십의 자리 곱(한 칸 왼쪽)', theme:BTHEME },
   B4:  { group:'b-mul', engine:'num', type:'b-mul-32', chalQ:10, chalTime:T(10,60), open:true,
          label:'(세 자리) × (두 자리)', desc:'연습장에 세로로 써서 계산해요', theme:BTHEME },
@@ -328,13 +328,25 @@ function passWindow(level) {
 /* ═══ 기초 레벨은 '한 판 안' 규칙 (선생님 결정 2026-11-17 — 완전 숙달) ═══
  * 여러 판을 이어 붙이지 않는다. 한 판에서
  *   20문제 레벨: 18개 맞히면 그 자리에서 통과 · 3개 틀리면 바로 끝나고 '다시 하기'
- *   10문제 레벨(B4·B8·B9·B10): 9개 맞히면 통과 · 2개 틀리면 바로 다시 하기
+ *   10문제 레벨(B3·B4·B8·B9·B10): 9개 맞히면 통과 · 2개 틀리면 바로 다시 하기
  */
 function isRunRule(level) { return !!(LEVEL_CONFIGS[level] && LEVEL_CONFIGS[level].open); }
 /** 한 판에서 이만큼 틀리면 판이 끝난다 (기초 레벨만) */
 function failAt(level) { return allowedWrong(level) + 1; }
 function windowCorrect(recent) { return (recent || []).reduce((n, v) => n + (v ? 1 : 0), 0); }
 function windowPassed(level, recent) { return windowCorrect(recent) >= passWindow(level).need; }
+/** 기초 한 판 판정. 판이 지금 문제 수보다 길면 예전에 더 긴 판으로 푼 기록이다
+ *  (B3: 2026-11-19 20문제 → 10문제). 그런 판은 그때 규칙(20문제 중 18개)으로 본다 —
+ *  안 그러면 예전에 '다시 하기'로 끝난 판(예: 9개 맞히고 3개 틀림)이 새 기준 9개로 통과가 돼 버린다. */
+function runPassed(level, run) {
+  if (run.length <= LEVEL_CONFIGS[level].chalQ) return windowPassed(level, run);
+  return windowCorrect(run) >= 20 - 2;
+}
+/** 교사 화면 'n/□'의 분모 — 예전 긴 판이 가장 최근 판이면 20으로 보여 준다 */
+function shownSize(level, run) {
+  const size = passWindow(level).size;
+  return (isRunRule(level) && run && run.length > size) ? 20 : size;
+}
 
 /** 예전 규칙의 통과 점수 — 문제별 정오(seq)가 없는 예전 기록에만 쓴다 */
 function unlockThreshold(level) { return LEVEL_MAX[level] - allowedWrong(level) * 2; }
@@ -356,7 +368,7 @@ function computeProgress(rows, scoreOf) {
     if (typeof r.seq === 'string' && SEQ_RE.test(r.seq) && isRunRule(lv)) {
       // 기초: 판마다 따로 판정. 레벨 화면 막대에는 가장 최근 판을 보여 준다
       const run = recent[lv] = [...r.seq].map(c => (c === '1' ? 1 : 0));
-      if (!passed[lv] && windowPassed(lv, run)) passed[lv] = true;
+      if (!passed[lv] && runPassed(lv, run)) passed[lv] = true;
     } else if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
       const size = passWindow(lv).size;
       const h = recent[lv] = recent[lv] || [];
@@ -502,7 +514,7 @@ function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
-  trackOf, prevInTrack, nextInTrack, isRunRule, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  trackOf, prevInTrack, nextInTrack, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass

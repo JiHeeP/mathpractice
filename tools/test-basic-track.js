@@ -55,6 +55,11 @@ check('기초: 레벨 화면 막대는 가장 최근 판', prog([row('B1', 'abor
 check('기초 판 규칙: 20문제 3개 틀리면 끝 · 10문제 2개', L.failAt('B1') === 3 && L.failAt('B4') === 2 && L.passWindow('B1').need === 18 && L.passWindow('B9').need === 9);
 check('분수 레벨은 예전처럼 이어 붙임 (9+9개 → 통과)', !!prog([row('L1', 'aborted', '111111111'), row('L1', 'aborted', '111111111')]).passed.L1);
 check('B4(10문제) 창 = 최근 10문제 중 9개', L.passWindow('B4').size === 10 && L.passWindow('B4').need === 9);
+check('B3(10문제) = 한 판 10문제 · 9개 통과 · 2개 틀리면 다시', L.LEVEL_CONFIGS.B3.chalQ === 10 && L.LEVEL_CONFIGS.B3.chalTime === 400 && L.passWindow('B3').need === 9 && L.failAt('B3') === 2);
+check('B3 예전 20문제 판: 9개 맞히고 3개 틀린 판은 통과 아님', !prog([row('B3', 'aborted', '1111111110100')]).passed.B3);
+check('B3 예전 20문제 판: 18개 맞힌 판은 그대로 통과', !!prog([row('B3', 'aborted', '1'.repeat(18))]).passed.B3);
+check('B3 새 10문제 판: 9개 맞히면 통과 · 8개는 아님', !!prog([row('B3', 'aborted', '1111111110')]).passed.B3 && !prog([row('B3', 'aborted', '1111111100')]).passed.B3);
+check('교사 화면 분모: B3 새 판 /10 · 예전 판 /20 · B1 /20', L.shownSize('B3', [1,1,1]) === 10 && L.shownSize('B3', new Array(13).fill(1)) === 20 && L.shownSize('B1', [1]) === 20);
 
 console.log('문제 만들기 (레벨마다 2,000문제)');
 const N = 2000;
