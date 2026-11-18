@@ -1,4 +1,4 @@
-# 분수 연산 마스터
+# 5학년 수학 연산 (옛 이름: 분수 연산 마스터)
 
 초등 분수·소수 연산 연습 웹앱 (37레벨). 배포 주소: https://mathpractice-five.vercel.app/ Google Apps Script(스프레드시트 + `google.script.run`)로 만들었던
 「수학 연산 마스터」를 **정적 웹앱 + Firebase Firestore** 로 옮긴 것입니다.
@@ -151,7 +151,7 @@ npm start          # http://127.0.0.1:8080
 ### 파일 하나로 묶어 나눠 주기 (서버·인터넷 없이)
 
 ```bash
-node tools/build-single-file.js     # → dist/분수연산마스터.html
+node tools/build-single-file.js     # → dist/5학년수학연산.html
 ```
 
 CSS와 JS를 전부 집어넣은 HTML 한 개가 나옵니다. 더블클릭하면 바로 열리므로
