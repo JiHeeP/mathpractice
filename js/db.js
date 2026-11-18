@@ -315,15 +315,17 @@ async function loadMyResults(code, studentNo) {
   }, MINE_CACHE_MS);
 }
 
-/** 기초 연산(B1~B10) 기록만 읽어 학생별 통과 현황을 만든다 — 교사 화면 '기초 연산' 탭.
- *  level 'in' 조건 하나라 따로 색인이 필요 없고, 반 전체 기록을 읽지 않아 읽기 수가 적다.
+/** 한 트랙(기초 B1~B10 · 소수의 곱셈 D1~D6 · 도형의 넓이 A1~A6)의 기록만 읽어 학생별 통과 현황을 만든다 — 교사 화면 '트랙 현황' 탭.
+ *  level 'in' 조건 하나라 따로 색인이 필요 없고, 반 전체 기록을 읽지 않아 읽기 수가 적다('in' 은 30개까지 — 트랙은 10개 이하).
+ *  분수·소수 트랙(37레벨)은 'in' 한도를 넘어서 여기서 다루지 않는다(학생 비교·랭킹 탭).
  *  돌려주는 값: { '번호': { passed:{B1:true}, recent:{B1:[1,0,..]}, solved:{B1:푼 문제 수}, lastTs } } */
-async function getBasicProgress(code, force) {
-  if (force) delete cache['basic:' + code];
-  return cached('basic:' + code, async () => {
+async function getBasicProgress(code, force, track = 'basic') {
+  const levels = Levels.TRACKS[track].levels, key = (track === 'basic' ? 'basic:' : `track:${track}:`) + code;
+  if (force) delete cache[key];
+  return cached(key, async () => {
     let rows;
-    if (isLocal()) rows = LS.get(`cls.${code}.results`, []).filter(r => Levels.BASIC_ORDER.indexOf(r.level) !== -1);
-    else rows = (await resultsCol(code).where('level', 'in', Levels.BASIC_ORDER).get()).docs.map(d => d.data());
+    if (isLocal()) rows = LS.get(`cls.${code}.results`, []).filter(r => levels.indexOf(r.level) !== -1);
+    else rows = (await resultsCol(code).where('level', 'in', levels).get()).docs.map(d => d.data());
     const by = {};
     rows.forEach(r => { const no = String(r.studentNo); (by[no] = by[no] || []).push(r); });
     const out = {};
