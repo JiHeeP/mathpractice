@@ -310,12 +310,14 @@ const doneBasic = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
 const nextBasic = () => L.nextBasicLevel(myStart(), state.progress.passed);
 /** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐)
  *  통과 못 한 기초 레벨이 있으면 묶음과 상관없이 무조건 첫째로 띄운다(선생님 결정 2026-11-17).
- *  가 묶음은 B3 통과 전까지 분수를 둘째 줄에도 띄우지 않는다. */
+ *  기초 연산이 남아 있는 동안에는 기초 연산만 보여 준다(선생님 결정 2026-11-20) — 둘째 줄('그다음')도,
+ *  아래의 분수·소수의 곱셈·도형의 넓이 메뉴도 띄우지 않는다. 기초를 다 끝내면 나머지가 나타난다. */
 function todayLevels() {
-  const b = nextBasic(), f = nextLevel(), p = myStart();
-  const list = (p && p.g === '가' && !doneBasic('B3')) ? [b] : [b, f];
-  return list.filter(Boolean);
+  const b = nextBasic(), f = nextLevel();
+  return (b ? [b] : [f]).filter(Boolean);
 }
+/** 기초 연산을 하는 중인가 — 그동안 레벨 화면에는 기초 연산 메뉴만 보인다 */
+const basicOnly = () => !!nextBasic();
 
 /** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
  *  잠긴 레벨도 누르면 카드에서 무엇을 먼저 통과해야 하는지 보여 준다. 잠금 계산은 levels.js 그대로.
@@ -392,7 +394,7 @@ function renderLevelButtons() {
     return el;
   };
 
-  L.TRACK_KEYS.forEach(t => {
+  L.TRACK_KEYS.filter(t => !basicOnly() || L.TRACKS[t].open).forEach(t => {
     const tr = L.TRACKS[t];
     const head = document.createElement('div');
     head.className = 'lv-track';
