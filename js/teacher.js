@@ -313,7 +313,7 @@ function loadTrackGrid(track, force) {
       const cells = levels.map(lv => {
         let txt = '', cls = '';
         if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
-        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.passWindow(lv).size}`; cls = 'bb-try'; }
+        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.shownSize(lv, p.recent[lv])}`; cls = 'bb-try'; }
         const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
         return `<td class="bb-cell ${cls}${lv === now && prog[no] ? ' bb-now' : ''}"${tip}>${txt}</td>`;
       }).join('');
@@ -354,7 +354,7 @@ function loadBasicGrid(force) {
         const nowCls = lv === now ? ' bb-now' : '';
         let txt = '', cls = '';
         if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
-        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.passWindow(lv).size}`; cls = 'bb-try'; }
+        else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.shownSize(lv, p.recent[lv])}`; cls = 'bb-try'; }
         else if (L.basicSkipped(st, lv)) { txt = '⤼'; cls = 'bb-skip'; }
         const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
         return `<td class="bb-cell ${cls}${nowCls}${edge}"${tip}>${txt}</td>`;
