@@ -123,7 +123,7 @@ const BASIC_CONFIGS = {
          label:'곱셈구구 나눗셈', desc:'21 ÷ 7 = 3 — 곱셈구구를 거꾸로', theme:BTHEME },
   B6:  { group:'b-div', engine:'num', type:'b-div-21', chalQ:20, chalTime:T(20,25), open:true,
          label:'(두 자리) ÷ (한 자리)', desc:'몫과 나머지를 써요 — 나머지는 나누는 수보다 작아요', theme:BTHEME },
-  B7:  { group:'b-div', engine:'num', type:'b-div-31', chalQ:20, chalTime:T(20,35), open:true,
+  B7:  { group:'b-div', engine:'num', type:'b-div-31', chalQ:10, chalTime:T(10,35), open:true,
          label:'(세 자리) ÷ (한 자리)', desc:'몫과 나머지를 써요', theme:BTHEME },
   B8:  { group:'b-div', engine:'num', type:'b-div-x2', chalQ:10, chalTime:T(10,60), open:true,
          label:'÷ (두 자리)', desc:'몫을 어림해서 곱해 보고 고쳐요 · 몫과 나머지', theme:BTHEME },
@@ -264,7 +264,7 @@ const DMUL_CONFIGS = {
         label:'(소수) × (자연수)', desc:'자연수처럼 곱하고, 곱하는 소수의 자릿수만큼 소수점을 찍어요', theme:DTHEME },
   D2: { group:'d-mul', engine:'num', type:'d-mul-nd', chalQ:20, chalTime:T(20,25),
         label:'(자연수) × (소수)', desc:'자연수처럼 곱하고, 소수의 자릿수만큼 소수점을 찍어요', theme:DTHEME },
-  D3: { group:'d-mul', engine:'num', type:'d-mul-11', chalQ:20, chalTime:T(20,35),
+  D3: { group:'d-mul', engine:'num', type:'d-mul-11', chalQ:10, chalTime:T(10,35), wasQ:20,
         label:'(소수) × (소수)', desc:'소수 한 자리 × 소수 한 자리 = 소수 두 자리 — 자리가 모자라면 앞에 0을 채워요', theme:DTHEME },
   D4: { group:'d-mul', engine:'num', type:'d-mul-21', chalQ:10, chalTime:T(10,50),
         label:'자릿수가 다른 소수의 곱셈', desc:'두 소수의 소수점 아래 자릿수를 더한 만큼 소수점을 찍어요', theme:DTHEME },
@@ -280,15 +280,15 @@ const ATHEME = {bg:'bg-teal-50', border:'border-teal-200', hbg:'hover:bg-teal-10
 const AREA_CONFIGS = {
   A1: { group:'a-area', engine:'num', type:'a-rect',  chalQ:20, chalTime:T(20,25),
         label:'직사각형 · 정사각형의 넓이', desc:'(가로) × (세로) · 정사각형은 (한 변) × (한 변)', theme:ATHEME },
-  A2: { group:'a-area', engine:'num', type:'a-para',  chalQ:20, chalTime:T(20,40),
+  A2: { group:'a-area', engine:'num', type:'a-para',  chalQ:10, chalTime:T(10,40), wasQ:20,
         label:'평행사변형의 넓이', desc:'(밑변) × (높이) — 높이는 밑변과 수직인 점선이에요', theme:ATHEME },
-  A3: { group:'a-area', engine:'num', type:'a-tri',   chalQ:20, chalTime:T(20,40),
+  A3: { group:'a-area', engine:'num', type:'a-tri',   chalQ:10, chalTime:T(10,40), wasQ:20,
         label:'삼각형의 넓이', desc:'(밑변) × (높이) ÷ 2 — 높이가 삼각형 밖에 있을 때도 있어요', theme:ATHEME },
-  A4: { group:'a-area', engine:'num', type:'a-rhom',  chalQ:20, chalTime:T(20,40),
+  A4: { group:'a-area', engine:'num', type:'a-rhom',  chalQ:10, chalTime:T(10,40), wasQ:20,
         label:'마름모의 넓이', desc:'(한 대각선) × (다른 대각선) ÷ 2', theme:ATHEME },
-  A5: { group:'a-area', engine:'num', type:'a-trap',  chalQ:20, chalTime:T(20,40),
+  A5: { group:'a-area', engine:'num', type:'a-trap',  chalQ:10, chalTime:T(10,40), wasQ:20,
         label:'사다리꼴의 넓이', desc:'(윗변 + 아랫변) × (높이) ÷ 2', theme:ATHEME },
-  A6: { group:'a-mix',  engine:'num', type:'a-mix',   chalQ:20, chalTime:T(20,45),
+  A6: { group:'a-mix',  engine:'num', type:'a-mix',   chalQ:10, chalTime:T(10,45), wasQ:20,
         label:'여러 가지 도형의 넓이', desc:'모양을 보고 알맞은 방법을 골라 넓이를 구해요', theme:ATHEME }
 };
 Object.assign(LEVEL_CONFIGS, BASIC_CONFIGS, DMUL_CONFIGS, AREA_CONFIGS);
@@ -328,7 +328,7 @@ function passWindow(level) {
 /* ═══ 기초 레벨은 '한 판 안' 규칙 (선생님 결정 2026-11-17 — 완전 숙달) ═══
  * 여러 판을 이어 붙이지 않는다. 한 판에서
  *   20문제 레벨: 18개 맞히면 그 자리에서 통과 · 3개 틀리면 바로 끝나고 '다시 하기'
- *   10문제 레벨(B3·B4·B8·B9·B10): 9개 맞히면 통과 · 2개 틀리면 바로 다시 하기
+ *   10문제 레벨(B3·B4·B7·B8·B9·B10): 9개 맞히면 통과 · 2개 틀리면 바로 다시 하기
  */
 function isRunRule(level) { return !!(LEVEL_CONFIGS[level] && LEVEL_CONFIGS[level].open); }
 /** 한 판에서 이만큼 틀리면 판이 끝난다 (기초 레벨만) */
@@ -370,12 +370,15 @@ function computeProgress(rows, scoreOf) {
       const run = recent[lv] = [...r.seq].map(c => (c === '1' ? 1 : 0));
       if (!passed[lv] && runPassed(lv, run)) passed[lv] = true;
     } else if (typeof r.seq === 'string' && SEQ_RE.test(r.seq)) {
-      const size = passWindow(lv).size;
+      // wasQ: 20문제였다가 10문제로 줄인 레벨(2026-11-19 D3·A2~A6). 예전 20문제 판은 그때 규칙(최근 20문제 중 18개)으로 본다 —
+      // 안 그러면 예전 판의 마지막 10문제만 보고 지난 기록이 새로 통과가 돼 버린다. 화면 막대는 맨 끝에서 지금 창 크기로 자른다
+      const cfg = LEVEL_CONFIGS[lv], old = !!(cfg.wasQ && r.seq.length > cfg.chalQ);
+      const w = old ? { size: 20, need: 18 } : passWindow(lv);
       const h = recent[lv] = recent[lv] || [];
       for (let i = 0; i < r.seq.length; i++) {
         h.push(r.seq[i] === '1' ? 1 : 0);
-        if (h.length > size) h.shift();
-        if (!passed[lv] && windowPassed(lv, h)) passed[lv] = true;
+        if (h.length > Math.max(20, w.size)) h.shift();
+        if (!passed[lv] && windowCorrect(h.slice(-w.size)) >= w.need) passed[lv] = true;
       }
     } else if (r.seq === undefined || r.seq === null) {
       const s = scoreOf ? scoreOf(r) : null;
@@ -388,6 +391,7 @@ function computeProgress(rows, scoreOf) {
     const idx = LEVEL_ORDER.indexOf(lv);
     if (Object.keys(passed).some(l => LEVEL_ORDER.indexOf(l) > idx)) passed[lv] = true;
   });
+  Object.keys(recent).forEach(lv => { if (!isRunRule(lv)) recent[lv] = recent[lv].slice(-passWindow(lv).size); });
   return { passed, recent };
 }
 
