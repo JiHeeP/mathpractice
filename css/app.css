@@ -261,3 +261,5 @@ body.num-wide .app-shell{max-width:64rem}
 .boss-hit-k{font-size:.95rem;font-weight:900;color:#1f2937}
 .boss-hit-k b{color:var(--c-no)}
 .boss-hit-why{font-size:.72rem;font-weight:700;color:var(--c-reward-ink);margin-left:.25rem}
+.boss-last{margin-top:.4rem;padding-top:.4rem;border-top:1px dashed #FCD34D;font-size:.85rem;font-weight:800;color:var(--c-reward-ink)}
+.boss-last b{color:#1f2937}

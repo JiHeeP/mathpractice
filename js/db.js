@@ -599,30 +599,50 @@ async function setGame(code, g) {
   return v;
 }
 const syncedWallet = {};
-function syncWallet(code, studentNo, dmg, startTs) {
+/** 내 데미지 요약 저장 — merge 로 써서 막타 기록(kills)은 지우지 않는다. lastHit = 마지막으로 보스를 깎은 시각 */
+function syncWallet(code, studentNo, dmg, startTs, lastHit) {
   if (isLocal()) return Promise.resolve();
   const no = String(studentNo), key = `${code}:${no}`, sig = `${startTs}:${dmg}`;
   if (syncedWallet[key] === sig) return Promise.resolve();
   syncedWallet[key] = sig;
-  return walletCol(code).doc(no).set({ studentNo: no, dmg, startTs, lastTs: Date.now() })
+  return walletCol(code).doc(no).set({ studentNo: no, dmg, startTs, lastHit: lastHit || 0, lastTs: Date.now() }, { merge: true })
     .catch(e => { delete syncedWallet[key]; console.warn('반 보스 데미지 저장 실패', e); });
 }
-/** 번호별 데미지 요약 [{ studentNo, dmg, startTs }] */
+/** 막타 기록을 내 요약에 덧붙인다 { s: 단계, ts, next: 바로 앞에 깎은 번호 } */
+function saveKill(code, studentNo, kill) {
+  const no = String(studentNo);
+  if (isLocal()) {
+    const l = LS.get(`cls.${code}.kills`, []); l.push(Object.assign({ studentNo: no }, kill)); LS.set(`cls.${code}.kills`, l.slice(-200));
+    return Promise.resolve();
+  }
+  return walletCol(code).doc(no).set({ kills: firebase.firestore.FieldValue.arrayUnion(kill) }, { merge: true })
+    .then(() => { delete cache['wallets:' + code]; })
+    .catch(e => console.warn('막타 기록 저장 실패', e));
+}
+/** 번호별 데미지 요약 [{ studentNo, dmg, startTs, lastHit, kills:[{ s, ts, next }] }] */
 async function loadWallets(code, force) {
   if (force) delete cache['wallets:' + code];
   return cached('wallets:' + code, async () => {
     if (isLocal()) {   // 로컬 모드는 요약을 따로 두지 않고 기록에서 바로 계산한다
-      const game = await getGame(code), by = {};
+      const game = await getGame(code), by = {}, kills = LS.get(`cls.${code}.kills`, []);
       LS.get(`cls.${code}.results`, []).forEach(r => { (by[String(r.studentNo)] = by[String(r.studentNo)] || []).push(r); });
-      return Object.keys(by).map(no => ({ studentNo: no, dmg: Game.damageOf(by[no], game, scoreOf).total, startTs: game ? game.startTs : 0 }));
+      return Object.keys(by).map(no => {
+        const d = Game.damageOf(by[no], game, scoreOf);
+        return { studentNo: no, dmg: d.total, startTs: game ? game.startTs : 0, lastHit: d.events.length ? d.events[d.events.length - 1].ts : 0,
+                 kills: kills.filter(k => String(k.studentNo) === no) };
+      });
     }
     const snap = await walletCol(code).get();
-    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), dmg: Number(d.data().dmg) || 0, startTs: Number(d.data().startTs) || 0 }));
+    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), dmg: Number(d.data().dmg) || 0, startTs: Number(d.data().startTs) || 0,
+                                 lastHit: Number(d.data().lastHit) || 0, kills: Array.isArray(d.data().kills) ? d.data().kills : [] }));
   }, WALLET_CACHE_MS);
 }
+const KILL_FRESH_MS = 2 * 60 * 1000;   // 방금 푼 판(2분 안)만 막타인지 따진다 — 그 뒤에는 친구들 데미지가 달라져 판정이 흔들린다
+const killChecked = {};
 /** 반 보스 지금 상태 — 게임이 꺼져 있으면 null.
  *  studentNo 를 주면 그 학생 몫은 자기 기록으로 바로 계산해 넣고(방금 푼 판까지 반영) 요약도 갱신한다.
- *  돌려주는 값: { game, mine:{ total, events }, total, boss, list:[{ studentNo, dmg }] } */
+ *  방금 푼 판이 보스를 쓰러뜨렸으면 막타로 적는다(그때는 친구들 요약을 새로 읽어 정확히 따진다).
+ *  돌려주는 값: { game, mine:{ total, events }, total, boss, list:[{ studentNo, dmg }], kills:[{ stage, by, next, pick, ts }] } */
 async function getBoss(code, studentNo, opts) {
   const game = await getGame(code, opts && opts.force);
   if (!Game.isOn(game)) return null;
@@ -630,15 +650,34 @@ async function getBoss(code, studentNo, opts) {
   let mine = { total: 0, events: [] };
   if (no && !Game.isExcluded(game, no)) {
     mine = Game.damageOf(await loadMyResults(code, no), game, scoreOf);
-    if (mine.total > 0) syncWallet(code, no, mine.total, game.startTs);
+    if (mine.total > 0) await syncWallet(code, no, mine.total, game.startTs, mine.events[mine.events.length - 1].ts);
   }
+  const fresh = mine.events.filter(e => Date.now() - e.ts < KILL_FRESH_MS && !killChecked[`${code}:${no}:${e.ts}`]);
   let wallets = [];
-  try { wallets = await loadWallets(code, opts && opts.force); } catch (e) { console.warn('반 보스 데미지 읽기 실패', e); }
-  const list = wallets.filter(w => w.startTs === game.startTs && !Game.isExcluded(game, w.studentNo) && w.studentNo !== no && w.dmg > 0)
-    .map(w => ({ studentNo: w.studentNo, dmg: w.dmg }));
+  try { wallets = await loadWallets(code, (opts && opts.force) || fresh.length > 0); } catch (e) { console.warn('반 보스 데미지 읽기 실패', e); }
+  const counted = wallets.filter(w => w.startTs === game.startTs && !Game.isExcluded(game, w.studentNo));
+  const others = counted.filter(w => w.studentNo !== no && w.dmg > 0);
+  const list = others.map(w => ({ studentNo: w.studentNo, dmg: w.dmg }));
   if (mine.total > 0) list.push({ studentNo: no, dmg: mine.total });
-  const total = Math.round(list.reduce((a, w) => a + w.dmg, 0) * 100) / 100;
-  return { game, mine, total, boss: Game.bossOf(total, game), list };
+  const r2 = v => Math.round(v * 100) / 100;
+  const total = r2(list.reduce((a, w) => a + w.dmg, 0));
+  const claims = [];
+  counted.forEach(w => w.kills.forEach(k => claims.push({ studentNo: w.studentNo, s: k.s, ts: k.ts, next: k.next })));
+  // 방금 푼 판이 보스를 쓰러뜨렸는가 — 내 데미지를 그 판까지만 더해 본다
+  const othersSum = others.reduce((a, w) => a + w.dmg, 0);
+  let run = 0;
+  mine.events.forEach(e => {
+    run += e.dmg;
+    if (fresh.indexOf(e) === -1) return;
+    killChecked[`${code}:${no}:${e.ts}`] = true;
+    const before = Game.bossOf(r2(othersSum + run - e.dmg), game), after = Game.bossOf(r2(othersSum + run), game);
+    if (after.killed <= before.killed || claims.some(c => Number(c.s) === before.stage && c.ts >= game.startTs)) return;
+    const prev = others.filter(w => w.lastHit > 0).sort((a, b) => b.lastHit - a.lastHit)[0];
+    const kill = { s: before.stage, ts: e.ts, next: prev ? prev.studentNo : '' };
+    claims.push(Object.assign({ studentNo: no }, kill));
+    saveKill(code, no, kill);
+  });
+  return { game, mine, total, boss: Game.bossOf(total, game), list, kills: Game.resolveKills(claims, game.startTs) };
 }
 
 async function getHistory(code, studentNo) {
@@ -796,6 +835,7 @@ async function clearRecords(code, onProgress) {
     removed.logs = LS.get(`cls.${code}.logs`, []).length;
     LS.set(`cls.${code}.results`, []);
     LS.set(`cls.${code}.logs`, []);
+    LS.del(`cls.${code}.kills`);
     invalidate();
     return removed;
   }

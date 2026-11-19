@@ -228,8 +228,18 @@ function showBoss(r) {
       <div class="boss-hit-k"><span aria-hidden="true">${shown.icon}</span> ${shown.name}에게 <b>−${Game.fmt(ev.dmg)}</b> <span class="boss-hit-why">${why}</span></div>
       <div class="boss-hp"><i style="width:${Math.max(0, Math.min(100, (hp / shown.max) * 100))}%"></i></div>
       <div class="boss-num">${killed ? `🎉 쓰러뜨렸어요! 다음 보스 ${boss.icon} ${boss.name} 등장` : `남은 체력 <b>${Game.fmt(hp)}</b> / ${shown.max}`}</div>
+      ${lastHitHTML(b, r.ts)}
     </div>`;
   }).catch(e => console.warn('반 보스 표시 실패', e));
+}
+
+/** 막타를 친 판이면 보상을 누가 고르는지 알려 준다 (두 번 연속 막타면 다음 사람이 고른다) */
+function lastHitHTML(b, ts) {
+  const me = String(App.studentNo), k = (b.kills || []).filter(x => x.by === me && x.ts === ts)[0];
+  if (!k) return '';
+  return `<div class="boss-last">👑 막타! ${k.pick === me
+    ? '이번 교실 보상은 내가 골라요. 선생님께 말해요.'
+    : `두 번 연속 막타라서 이번 보상은 <b>${k.pick}번</b> 친구가 골라요.`}</div>`;
 }
 
 function showScore(r) {
