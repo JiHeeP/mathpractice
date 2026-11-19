@@ -416,7 +416,15 @@ function renderGame(force) {
         <div class="boss-main"><div class="boss-k">${boss.stage}단계 · 쓰러뜨린 보스 ${boss.killed}마리</div><div class="boss-n">${boss.name}</div>
           <div class="boss-hp"><i style="width:${pct}%"></i></div>
           <div class="boss-num">남은 체력 <b>${Game.fmt(boss.hp)}</b> / ${boss.max} · 지금까지 깎은 체력 ${Game.fmt(b.total)} · 참여 ${b.list.length}명</div></div></div>
-        <p class="text-xs text-slate-500 mt-1">시작: ${new Date(g.startTs).toLocaleString('ko-KR')} · 다른 학생의 데미지는 몇 분 늦게 반영됩니다.</p>`;
+        <p class="text-xs text-slate-500 mt-1">시작: ${new Date(g.startTs).toLocaleString('ko-KR')} · 다른 학생의 데미지는 몇 분 늦게 반영됩니다.</p>
+        ${b.kills.length ? `<table class="w-full text-sm mt-2 bg-white rounded-lg overflow-hidden"><thead><tr class="text-xs text-slate-500 bg-slate-100">
+            <th class="px-2 py-1 text-left">쓰러뜨린 보스</th><th class="px-2 py-1">막타</th><th class="px-2 py-1">보상 고르는 번호</th><th class="px-2 py-1">때</th></tr></thead><tbody>
+          ${b.kills.slice().reverse().map(k => { const bs = Game.BOSSES[(k.stage - 1) % Game.BOSSES.length]; return `<tr class="border-t">
+            <td class="px-2 py-1">${k.stage}단계 ${bs[0]} ${bs[1]}</td><td class="px-2 py-1 text-center font-bold">${esc(k.by)}번</td>
+            <td class="px-2 py-1 text-center font-black">${esc(k.pick)}번${k.pick !== k.by ? ' <span class="text-xs font-normal text-slate-500">(두 번 연속 → 다음 사람)</span>' : ''}</td>
+            <td class="px-2 py-1 text-center text-xs text-slate-500">${new Date(k.ts).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td></tr>`; }).join('')}
+          </tbody></table>
+          <p class="text-xs text-slate-500 mt-1">같은 학생이 두 번 연속 막타면, 그 보스는 막타 바로 앞에 보스를 깎은 학생이 보상을 고릅니다.</p>` : ''}`;
     });
   }).catch(e => { $('gameBoss').innerHTML = `<p class="text-sm text-red-500">불러오지 못했습니다: ${esc(e.message || e)}</p>`; });
 }

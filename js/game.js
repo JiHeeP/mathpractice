@@ -8,6 +8,8 @@
  *
  * 데미지는 따로 적어 두지 않고 학생 자기 기록(results)에서 그때그때 다시 계산한다.
  *   → 저장이 늦거나 기기를 바꿔도 값이 같다. 반 합계는 번호별 요약(classes/{code}/wallet/{번호})을 더한다.
+ * 막타: 보스를 쓰러뜨린 마지막 한 방을 친 학생. 교실 보상을 고른다(선생님 결정 2026-11-20).
+ *   같은 학생이 두 번 연속 막타면 그 보스의 보상은 '다음 사람'(막타 바로 앞에 보스를 깎은 학생)이 고른다.
  * 나중에 꾸미기 배수가 들어오면 기록 한 줄의 mult 를 곱한다(없으면 1).
  */
 (() => {
@@ -78,6 +80,24 @@ function bossOf(total, game) {
   return { stage: i + 1, icon: b[0], name: b[1], max, hp: r2(max - left), killed: i };
 }
 
+/** 막타 기록들 → 단계별 [{ stage, by(막타 번호), next(바로 앞에 깎은 번호), pick(보상 고르는 번호), ts }]
+ *  claims = [{ studentNo, s(단계), ts, next }] — 학생 기기가 저마다 적으므로 같은 단계가 겹칠 수 있다. 가장 이른 것만 인정한다.
+ *  바로 앞 단계와 막타가 같은 학생이면 next 가 고른다(next 가 없으면 그대로). */
+function resolveKills(claims, startTs) {
+  const by = {};
+  (claims || []).forEach(c => {
+    const s = Number(c && c.s), ts = Number(c && c.ts);
+    if (!(s >= 1) || !(ts >= (Number(startTs) || 0)) || c.studentNo == null) return;
+    if (!by[s] || ts < by[s].ts) by[s] = { stage: s, by: String(c.studentNo), next: c.next ? String(c.next) : '', ts };
+  });
+  const list = Object.keys(by).map(Number).sort((a, b) => a - b).map(s => by[s]);
+  list.forEach(k => {
+    const prev = by[k.stage - 1];
+    k.pick = prev && prev.by === k.by && k.next ? k.next : k.by;
+  });
+  return list;
+}
+
 /** 화면에 쓰는 숫자 — 소수 첫째 자리까지, 필요 없는 0은 뺀다 (0.3 · 1 · 12.6) */
 function fmt(v) { return String(Math.round((Number(v) || 0) * 10) / 10); }
 
@@ -86,5 +106,5 @@ function parseExclude(text) {
   return String(text || '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).slice(0, 40);
 }
 
-window.Game = { PASS_DMG, CHIP_DMG, CHIP_NEED, DEFAULT_COEFS, BOSSES, coefAt, hpAt, isOn, isExcluded, damageOf, bossOf, fmt, parseExclude };
+window.Game = { PASS_DMG, CHIP_DMG, CHIP_NEED, DEFAULT_COEFS, BOSSES, coefAt, hpAt, isOn, isExcluded, damageOf, bossOf, resolveKills, fmt, parseExclude };
 })();
