@@ -143,6 +143,7 @@ function finishHTML() {
       <div class="mb-3 text-sm font-bold text-gray-600">이 레벨은 한 판에서 ${Levels.passWindow(S.level).need}개를 맞혀야 통과해요.<br>처음부터 다시 해 봐요!</div>
       <div class="res-row"><span class="t-ok">⭕ ${S.correct}</span><span class="t-no">❌ ${S.incorrect}</span></div>
       <div class="mb-4 text-sm text-gray-500"><span id="sessScoreNote">저장 중...</span><span id="sessScore" class="hidden"></span></div>
+      <div id="sessBoss"></div>
       <div class="flex flex-col gap-3"><button onclick="Session.exit('again')" class="big-btn big-go">🔁 다시 하기</button>
         <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
     </div>`;
@@ -169,6 +170,7 @@ function finishHTML() {
     ${S.passedEarly
       ? '<div class="mb-4 text-sm text-gray-500"><span id="sessScoreNote">저장 중...</span><span id="sessScore" class="hidden"></span></div>'
       : '<div class="mb-4 text-sm text-gray-500">점수 <b id="sessScore" class="t-reward">계산 중...</b> · <span id="sessScoreNote">저장 중...</span></div>'}
+    <div id="sessBoss"></div>
     <div class="flex flex-col gap-3">${buttons}
       <button onclick="Session.exit()" class="text-sm font-bold text-gray-500 underline mt-1">목록으로</button></div>
   </div>`;
@@ -205,8 +207,29 @@ function saveResult() {
   S.saved = true;
   DB.clearDraft();
   DB.saveResult(App.classCode, buildPayload())
-    .then(showScore)
+    .then(r => { showScore(r); showBoss(r); })
     .catch(() => showScore({ displayScore: null, scoreRecorded: false, message: '점수 저장에 실패했습니다.', isError: true }));
+}
+
+/** 결과 화면의 반 보스 칸 — 이번 판으로 보스를 깎았을 때만 보여 준다(통과 1, 그날 맞힌 문제 10개째 0.3).
+ *  게임이 꺼져 있거나 읽기에 실패하면 아무것도 그리지 않는다. */
+function showBoss(r) {
+  if (!r || !r.ts || !isChallenge()) return;
+  DB.getBoss(App.classCode, App.studentNo).then(b => {
+    const box = document.getElementById('sessBoss');
+    if (!b || !box) return;
+    const ev = b.mine.events.filter(e => e.ts === r.ts)[0];
+    if (!ev) return;
+    const boss = b.boss, before = Game.bossOf(b.total - ev.dmg, b.game);
+    const killed = boss.stage > before.stage;
+    const shown = killed ? before : boss, hp = killed ? 0 : boss.hp;
+    const why = ev.pass && ev.chip ? '통과 + 오늘 10문제' : ev.pass ? '레벨 통과' : '오늘 10문제 맞힘';
+    box.innerHTML = `<div class="boss-hit">
+      <div class="boss-hit-k"><span aria-hidden="true">${shown.icon}</span> ${shown.name}에게 <b>−${Game.fmt(ev.dmg)}</b> <span class="boss-hit-why">${why}</span></div>
+      <div class="boss-hp"><i style="width:${Math.max(0, Math.min(100, (hp / shown.max) * 100))}%"></i></div>
+      <div class="boss-num">${killed ? `🎉 쓰러뜨렸어요! 다음 보스 ${boss.icon} ${boss.name} 등장` : `남은 체력 <b>${Game.fmt(hp)}</b> / ${shown.max}`}</div>
+    </div>`;
+  }).catch(e => console.warn('반 보스 표시 실패', e));
 }
 
 function showScore(r) {
