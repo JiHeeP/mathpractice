@@ -126,7 +126,7 @@ function switchTab(tab) {
     $(`tpanel-${t}`).classList.toggle('hidden', t !== tab);
     $(`ttab-${t}`).classList.toggle('ttab-on', t === tab);
   });
-  if (tab === 'settings') { loadStudents(); renderOffDays(); renderBasicStart(); }
+  if (tab === 'settings') { loadStudents(); renderOffDays(); renderBasicStart(); renderGame(); }
   if (tab === 'ranking') loadRanking();
   if (tab === 'basic') loadBasic();
   if (tab === 'comparison') { initCompareDates(); loadComparison(); }
@@ -389,6 +389,67 @@ function saveBasicStart() {
   }).catch(e => { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = '저장 실패: ' + (e.message || ''); });
 }
 
+/* ── 반 보스 (반 설정, Firestore classes/{code}/game/state — 규칙은 game.js) ──
+ * 학생 수는 체력(= 학생 수 × 2) 계산에만 쓴다. 처음에는 명단 수에서 빼는 번호를 뺀 값을 채워 준다. */
+let gameNow = null;
+function renderGame(force) {
+  const code = currentClass.code;
+  Promise.all([DB.getGame(code, force), DB.getStudents(code)]).then(([g, students]) => {
+    if (!currentClass || currentClass.code !== code) return;
+    gameNow = g;
+    const on = Game.isOn(g);
+    $('gameState').textContent = on ? '· 켜짐' : '· 꺼짐';
+    $('gameOnBtn').textContent = on ? '저장' : '켜기';
+    $('gameOffBtn').classList.toggle('hidden', !on);
+    $('gameRestartBtn').classList.toggle('hidden', !on);
+    if (document.activeElement !== $('gameExclude')) $('gameExclude').value = g ? g.exclude.join(', ') : '';
+    if (document.activeElement !== $('gameN')) {
+      const ex = g ? g.exclude : [];
+      $('gameN').value = g && g.base ? Math.round(g.base / 2) : (students.filter(st => ex.indexOf(String(st.number)) === -1).length || '');
+    }
+    if (!on) { $('gameBoss').innerHTML = ''; return; }
+    return DB.getBoss(code, null, { force }).then(b => {
+      if (!b || !currentClass || currentClass.code !== code) return;
+      const boss = b.boss, pct = Math.max(0, Math.min(100, (boss.hp / boss.max) * 100));
+      $('gameBoss').innerHTML = `<div class="boss-band">
+        <div class="boss-face" aria-hidden="true">${boss.icon}</div>
+        <div class="boss-main"><div class="boss-k">${boss.stage}단계 · 쓰러뜨린 보스 ${boss.killed}마리</div><div class="boss-n">${boss.name}</div>
+          <div class="boss-hp"><i style="width:${pct}%"></i></div>
+          <div class="boss-num">남은 체력 <b>${Game.fmt(boss.hp)}</b> / ${boss.max} · 지금까지 깎은 체력 ${Game.fmt(b.total)} · 참여 ${b.list.length}명</div></div></div>
+        <p class="text-xs text-slate-500 mt-1">시작: ${new Date(g.startTs).toLocaleString('ko-KR')} · 다른 학생의 데미지는 몇 분 늦게 반영됩니다.</p>`;
+    });
+  }).catch(e => { $('gameBoss').innerHTML = `<p class="text-sm text-red-500">불러오지 못했습니다: ${esc(e.message || e)}</p>`; });
+}
+function gameSave(next, okText) {
+  const msg = $('gameMessage');
+  msg.className = 'text-sm font-bold text-gray-500'; msg.textContent = '저장 중...';
+  return DB.setGame(currentClass.code, next).then(() => {
+    msg.className = 'text-sm font-bold text-emerald-600'; msg.textContent = okText;
+    setTimeout(() => msg.textContent = '', 3000);
+    renderGame(true);
+  }).catch(e => {
+    msg.className = 'text-sm font-bold text-red-500';
+    msg.textContent = /permission|insufficient/i.test(String(e && (e.code || e.message)))
+      ? '저장 실패: 보안 규칙을 먼저 배포해야 합니다 (firebase deploy --only firestore:rules)'
+      : '저장 실패: ' + ((e && e.message) || '');
+  });
+}
+function saveGame(on) {
+  const msg = $('gameMessage');
+  const n = Math.round(Number($('gameN').value));
+  if (on && !(n >= 1 && n <= 1000)) { msg.className = 'text-sm font-bold text-red-500'; msg.textContent = '학생 수를 적어 주세요.'; return; }
+  const g = gameNow || {};
+  // 처음 켤 때만 시작 시각을 정한다. 껐다 켜도 이어서 센다(새로 시작은 따로 버튼)
+  const next = { on: !!on, startTs: g.startTs || Date.now(), base: n >= 1 ? n * 2 : (g.base || 0),
+                 coefs: g.coefs || Game.DEFAULT_COEFS.slice(), exclude: Game.parseExclude($('gameExclude').value) };
+  gameSave(next, on ? `저장했습니다 (1단계 체력 ${next.base})` : '껐습니다. 학생 화면에서 보스가 사라집니다.');
+}
+function restartGame() {
+  if (!gameNow) return;
+  if (!confirm('보스를 1단계부터 새로 시작할까요?\n지금까지 깎은 체력은 0이 됩니다. 학생들의 연습·도전 기록은 지워지지 않습니다.')) return;
+  gameSave(Object.assign({}, gameNow, { startTs: Date.now() }), '1단계부터 새로 시작했습니다.');
+}
+
 /* ── 등교 안 하는 날 (반 설정, Firestore classes/{code}.offDays) ── */
 function renderOffDays() {
   const list = offDays();
@@ -487,6 +548,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, setGridTrack, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, saveGame, restartGame, loadBasic, setGridTrack, printCards
 };
 })();
