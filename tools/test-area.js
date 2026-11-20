@@ -24,7 +24,13 @@ check('A2~A6 은 앞 레벨을 통과해야 열림', ['A2','A3','A4','A5','A6'].
   return !L.isLevelUnlocked(lv, {}) && L.isLevelUnlocked(lv, { [prev]: true }) && L.prevInTrack(lv) === prev;
 }));
 check('소수의 곱셈 통과(D6)로 A 레벨이 열리지 않음', !L.isLevelUnlocked('A2', { D6: true }));
-check('최근 문제 창 규칙 · 20문제 중 18개', L.AREA_ORDER.every(lv => !L.isRunRule(lv) && L.passWindow(lv).need === 18));
+check('최근 문제 창 규칙 · A1 20문제 중 18개 · A2~A6 10문제 중 9개(2026-11-19)', L.AREA_ORDER.every(lv => !L.isRunRule(lv)) && L.passWindow('A1').need === 18
+  && ['A2','A3','A4','A5','A6'].every(lv => L.LEVEL_CONFIGS[lv].chalQ === 10 && L.passWindow(lv).size === 10 && L.passWindow(lv).need === 9));
+const at = (seqs) => seqs.map((seq, i) => ({ level: 'A2', mode: 'challenge', ts: i + 1, seq }));
+check('A2 예전 20문제 판: 마지막 10개 중 9개여도 20문제 중 16개면 통과 아님', !L.computeProgress(at(['1110111011' + '1111111110']), () => null).passed.A2);
+check('A2 예전 20문제 판 18개 → 통과', !!L.computeProgress(at(['11111111110111111110']), () => null).passed.A2);
+check('A2 새 10문제 판 9개 → 통과', !!L.computeProgress(at(['11111111110111011101', '1111111110']), () => null).passed.A2);
+check('A2 새 판 8개 → 통과 아님, 화면 막대는 10칸', (p => !p.passed.A2 && p.recent.A2.length === 10)(L.computeProgress(at(['1111111100']), () => null)));
 check('만점 100 · 이름 8자 이하 · 랭킹 제외', L.AREA_ORDER.every(lv => L.LEVEL_MAX[lv] === 100 && lv.length <= 8 && L.LEVEL_ORDER.indexOf(lv) === -1));
 check('모두 숫자 입력', L.AREA_ORDER.every(lv => L.LEVEL_CONFIGS[lv].engine === 'num'));
 
