@@ -149,16 +149,16 @@ function finishHTML() {
   }
   const dur = elapsed();
   const over = S.overtime || dur > S.timeLimit;
-  const next = App.levelAfter(S.level);
+  const next = App.levelAfter(S.level), nextName = next ? Levels.levelName(next) : '';
   const head = S.passedEarly ? `<div class="res-big t-ok">통과! 🎉</div><div class="mb-3 text-sm font-bold t-ok">${S.runRule ? `이번 판에서 ${S.correct}개를 맞혀서 바로 통과했어요` : '최근 문제를 거의 다 맞혀서 바로 통과했어요'}</div>`
              : S.justPassed ? '<div class="res-big t-ok">통과! 🎉</div>'
              : S.wasPassed ? '<div class="res-big t-main">잘했어요!</div>'
              : '<div class="res-big t-main">다 풀었어요!</div>';
   const openLv = S.cfg && S.cfg.open;   // 기초 트랙은 원래 열려 있으므로 '열렸어요' 대신 다음 레벨만 알려 준다
   const passNote = S.justPassed && next
-    ? `<div class="mb-3 rounded-xl box-ok px-4 py-2 text-sm font-black">${openLv ? `다음은 ${next}` : `${next} 도전이 열렸어요`}</div>` : '';
+    ? `<div class="mb-3 rounded-xl box-ok px-4 py-2 text-sm font-black">${openLv ? `다음은 ${nextName}` : `${nextName} 도전이 열렸어요`}</div>` : '';
   const buttons = S.justPassed && next
-    ? `<button onclick="Session.exit('next')" class="big-btn big-go">${next}로 가기 👉</button>
+    ? `<button onclick="Session.exit('next')" class="big-btn big-go">${nextName}(으)로 가기 👉</button>
        <button onclick="Session.exit('again')" class="big-btn big-alt">한 번 더</button>`
     : `<button onclick="Session.exit('again')" class="big-btn big-go">🔥 한 번 더</button>`;
   return `<div class="bg-white p-6 rounded-2xl border border-gray-200 text-center">

@@ -284,7 +284,7 @@ let gridTrack = 'basic';
 function setGridTrack(t) { gridTrack = t; loadBasic(); }
 function loadBasic(force) {
   $('tGridTracks').innerHTML = GRID_TRACKS.map(t =>
-    `<button class="ttab${t === gridTrack ? ' ttab-on' : ''}" onclick="Teacher.setGridTrack('${t}')">${Levels.TRACKS[t].label}</button>`).join('');
+    `<button class="ttab${t === gridTrack ? ' ttab-on' : ''}" onclick="Teacher.setGridTrack('${t}')">${Levels.TRACKS[t].letter}. ${Levels.TRACKS[t].label}</button>`).join('');
   $('tBasicLegend').classList.toggle('hidden', gridTrack !== 'basic');
   $('tTrackLegend').classList.toggle('hidden', gridTrack === 'basic');
   if (gridTrack === 'basic') return loadBasicGrid(force);
@@ -296,7 +296,7 @@ function loadTrackGrid(track, force) {
   const L = Levels, code = currentClass.code, levels = L.TRACKS[track].levels;
   $('tBasicHead').innerHTML = `<tr class="bg-slate-200 text-xs text-slate-800">
       <th class="px-2 py-2 sticky left-0 bg-slate-200">번호</th>
-      ${levels.map(lv => `<th class="px-1 py-2" title="${L.LEVEL_CONFIGS[lv].label}">${lv}</th>`).join('')}
+      ${levels.map(lv => `<th class="px-1 py-2" title="${lv} · ${L.LEVEL_CONFIGS[lv].label}">${L.levelName(lv)}</th>`).join('')}
       <th class="px-2 py-2 border-l border-slate-300">통과</th></tr>`;
   const tb = $('tBasicBody'), span = levels.length + 2;
   tb.innerHTML = `<tr><td colspan="${span}" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>`;
@@ -314,7 +314,7 @@ function loadTrackGrid(track, force) {
         let txt = '', cls = '';
         if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
         else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.shownSize(lv, p.recent[lv])}`; cls = 'bb-try'; }
-        const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
+        const tip = p.solved[lv] ? ` title="${L.levelName(lv)} · 푼 문제 ${p.solved[lv]}개"` : '';
         return `<td class="bb-cell ${cls}${lv === now && prog[no] ? ' bb-now' : ''}"${tip}>${txt}</td>`;
       }).join('');
       return `<tr class="border-b border-slate-100"><td class="px-2 py-2 text-center font-black sticky left-0 bg-white">${no}</td>${cells}
@@ -333,7 +333,7 @@ function loadBasicGrid(force) {
       ${Object.keys(L.BASIC_LINES).map(k => `<th colspan="${L.BASIC_LINES[k].length}" class="px-2 py-1 border-l border-slate-300">${lineName[k]}</th>`).join('')}
       <th rowspan="2" class="px-2 py-2 border-l border-slate-300">통과</th></tr>
     <tr class="bg-slate-100 text-xs text-slate-600">${L.BASIC_ORDER.map(lv =>
-      `<th class="px-1 py-1 ${L.BASIC_LINES[Object.keys(L.BASIC_LINES).find(k => L.BASIC_LINES[k][0] === lv)] ? 'border-l border-slate-300' : ''}" title="${L.LEVEL_CONFIGS[lv].label}">${lv}</th>`).join('')}</tr>`;
+      `<th class="px-1 py-1 ${L.BASIC_LINES[Object.keys(L.BASIC_LINES).find(k => L.BASIC_LINES[k][0] === lv)] ? 'border-l border-slate-300' : ''}" title="${lv} · ${L.LEVEL_CONFIGS[lv].label}">${L.levelName(lv)}</th>`).join('')}</tr>`;
   const tb = $('tBasicBody');
   tb.innerHTML = `<tr><td colspan="${L.BASIC_ORDER.length + 3}" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>`;
   Promise.all([DB.getBasicProgress(code, force), DB.getStudents(code)]).then(([prog, students]) => {
@@ -356,7 +356,7 @@ function loadBasicGrid(force) {
         if (p.passed[lv]) { txt = '✓'; cls = 'bb-pass'; }
         else if (p.recent[lv] && p.recent[lv].length) { txt = `${L.windowCorrect(p.recent[lv])}/${L.shownSize(lv, p.recent[lv])}`; cls = 'bb-try'; }
         else if (L.basicSkipped(st, lv)) { txt = '⤼'; cls = 'bb-skip'; }
-        const tip = p.solved[lv] ? ` title="${lv} · 푼 문제 ${p.solved[lv]}개"` : '';
+        const tip = p.solved[lv] ? ` title="${L.levelName(lv)} · 푼 문제 ${p.solved[lv]}개"` : '';
         return `<td class="bb-cell ${cls}${nowCls}${edge}"${tip}>${txt}</td>`;
       }).join('');
       return `<tr class="border-b border-slate-100"><td class="px-2 py-2 text-center font-black sticky left-0 bg-white">${no}</td>
@@ -420,7 +420,7 @@ function loadComparison() {
     list.forEach(it => {
       const dc = it.diff === null ? 'text-gray-400' : it.diff > 0 ? 'text-emerald-600' : it.diff < 0 ? 'text-rose-600' : 'text-slate-600';
       const cell = (s, lv) => s === null ? '<span class="text-gray-400">-</span>'
-        : `<div class="font-bold text-slate-800">${s}</div><div class="text-xs text-slate-500">${lv}</div>`;
+        : `<div class="font-bold text-slate-800">${s}</div><div class="text-xs text-slate-500">${Levels.levelName(lv)}</div>`;
       const diff = it.diff === null ? '-' : it.diff > 0 ? `+${it.diff}` : `${it.diff}`;
       const tr = document.createElement('tr');
       tr.className = 'border-b hover:bg-slate-50';

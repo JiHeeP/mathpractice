@@ -29,27 +29,41 @@ const DMUL_ORDER = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'];
 const AREA_ORDER = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'];
 
 /** 트랙 — 화면에 보이는 순서대로. open: true 면 레벨이 모두 항상 열려 있다 */
+/*  화면 이름(선생님 결정 2026-11-20): 트랙마다 글자 a~e, 트랙 안 순서대로 번호 — a1, b1, b2 …
+ *  속 이름(B1 · L1 · D1 · A1)은 그대로 둔다. 기록 · 보안 규칙 · 기초 시작점 칸 · 학급 관리 사이트가 속 이름을 쓴다.
+ *  분수 · 소수(L1~L36)는 화면에서 둘로 나눈다: b = L1~L22(분수 · 소수 기초), c = L23~L36(분수의 곱셈).
+ *  잠금은 예전처럼 L 한 줄로 이어진다(L23 은 L22 를 통과해야 열림) — chainOf 참고. */
+const FRAC_BASE = LEVEL_ORDER.slice(0, LEVEL_ORDER.indexOf('L23'));
+const FRAC_MUL  = LEVEL_ORDER.slice(LEVEL_ORDER.indexOf('L23'));
 const TRACKS = Object.freeze({
-  basic: { label: '기초 연산', levels: BASIC_ORDER, open: true },
-  frac:  { label: '분수 · 소수', levels: LEVEL_ORDER, open: false },
-  dmul:  { label: '소수의 곱셈', levels: DMUL_ORDER, open: false },
-  area:  { label: '도형의 넓이', levels: AREA_ORDER, open: false }
+  basic: { letter: 'a', label: '기초 연산', levels: BASIC_ORDER, open: true },
+  frac:  { letter: 'b', label: '분수 · 소수 기초', levels: FRAC_BASE, open: false },
+  fmul:  { letter: 'c', label: '분수의 곱셈', levels: FRAC_MUL, open: false },
+  dmul:  { letter: 'd', label: '소수의 곱셈', levels: DMUL_ORDER, open: false },
+  area:  { letter: 'e', label: '도형의 넓이', levels: AREA_ORDER, open: false }
 });
-const TRACK_KEYS = ['basic', 'frac', 'dmul', 'area'];
+const TRACK_KEYS = ['basic', 'frac', 'fmul', 'dmul', 'area'];
 /** 모든 레벨 (트랙 순서대로) */
 const ALL_LEVELS = [].concat(...TRACK_KEYS.map(k => TRACKS[k].levels));
 
 function trackOf(level) { return TRACK_KEYS.find(k => TRACKS[k].levels.indexOf(level) !== -1) || null; }
-/** 같은 트랙에서 바로 앞 레벨 — 트랙의 첫 레벨이면 null */
+/** 잠금 · '다음 레벨'이 따라가는 줄 — b · c 는 화면만 나뉘고 L1~L36 한 줄로 이어진다 */
+function chainOf(t) { return (t === 'frac' || t === 'fmul') ? LEVEL_ORDER : TRACKS[t].levels; }
+/** 화면에 보이는 레벨 이름 — B3 → a3, L23 → c1, D1 → d1, A1 → e1 (모르는 이름은 그대로) */
+function levelName(lv) {
+  const t = trackOf(lv); if (!t) return lv || '-';
+  return TRACKS[t].letter + (TRACKS[t].levels.indexOf(lv) + 1);
+}
+/** 같은 줄에서 바로 앞 레벨 — 줄의 첫 레벨이면 null */
 function prevInTrack(level) {
   const t = trackOf(level); if (!t) return null;
-  const list = TRACKS[t].levels, i = list.indexOf(level);
+  const list = chainOf(t), i = list.indexOf(level);
   return i > 0 ? list[i - 1] : null;
 }
 /** 같은 트랙에서 바로 다음 레벨 — 기초 트랙은 같은 줄 안에서만 (B4 다음은 B5가 아니라 없음) */
 function nextInTrack(level) {
   const t = trackOf(level); if (!t) return null;
-  let list = TRACKS[t].levels;
+  let list = chainOf(t);
   if (t === 'basic') list = Object.values(BASIC_LINES).find(l => l.indexOf(level) !== -1);
   const i = list.indexOf(level);
   return i >= 0 && i + 1 < list.length ? list[i + 1] : null;
@@ -515,7 +529,7 @@ function formatBasicStart(map) {
 }
 
 /* ═══ 학생 화면에 보이는 트랙 (선생님 결정 2026-11-20) ═══
- * 지금 푸는 트랙 하나만 보인다. 순서: 기초 연산 → 분수·소수 → 소수의 곱셈 → 도형의 넓이.
+ * 지금 푸는 트랙 하나만 보인다. 순서: a 기초 연산 → b 분수·소수 기초 → c 분수의 곱셈 → d 소수의 곱셈 → e 도형의 넓이.
  * 통과 못 한 레벨이 남은 첫 트랙이 '지금'. 기초는 시작점(basicStart)을 따른다.
  * 모든 트랙을 끝냈으면 null — 그때는 전부 보여 다시 풀 수 있게 한다. */
 function currentTrack(start, passed) {
@@ -529,11 +543,11 @@ function nextInTrackFor(track, start, passed) {
   return TRACKS[track].levels.find(lv => !(passed && passed[lv]) && isLevelUnlocked(lv, passed)) || null;
 }
 
-function getLevelLabel(lv) { return lv || '-'; }
+function getLevelLabel(lv) { return levelName(lv); }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
-  trackOf, prevInTrack, nextInTrack, currentTrack, nextInTrackFor, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  trackOf, levelName, prevInTrack, nextInTrack, currentTrack, nextInTrackFor, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass

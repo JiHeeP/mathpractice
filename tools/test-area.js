@@ -17,7 +17,7 @@ let fails = 0;
 const check = (name, cond) => { console.log((cond ? '  ✔ ' : '  ✘ ') + name); if (!cond) fails++; };
 
 console.log('트랙 · 잠금');
-check('도형의 넓이 트랙 A1~A6', L.TRACKS.area.levels.join() === 'A1,A2,A3,A4,A5,A6' && L.TRACK_KEYS.join() === 'basic,frac,dmul,area');
+check('도형의 넓이 트랙 A1~A6', L.TRACKS.area.levels.join() === 'A1,A2,A3,A4,A5,A6' && L.TRACK_KEYS.join() === 'basic,frac,fmul,dmul,area');
 check('A1 은 처음부터 열림', L.isLevelUnlocked('A1', {}));
 check('A2~A6 은 앞 레벨을 통과해야 열림', ['A2','A3','A4','A5','A6'].every((lv, i) => {
   const prev = 'A' + (i + 1);
