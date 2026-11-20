@@ -18,7 +18,7 @@ let fails = 0;
 const check = (name, cond) => { console.log((cond ? '  ✔ ' : '  ✘ ') + name); if (!cond) fails++; };
 
 console.log('트랙');
-check('분수·소수 트랙 37레벨 그대로', L.LEVEL_ORDER.length === 37 && L.TRACKS.frac.levels === L.LEVEL_ORDER);
+check('분수·소수 37레벨 그대로 — 화면에서 b(L1~L22) · c(L23~L36)로 나뉨', L.LEVEL_ORDER.length === 37 && L.TRACKS.frac.levels.concat(L.TRACKS.fmul.levels).join() === L.LEVEL_ORDER.join());
 check('기초 트랙 B1~B10', L.BASIC_ORDER.join() === 'B1,B2,B3,B4,B5,B6,B7,B8,B9,B10');
 check('모든 레벨 59개(기초 10 + 분수·소수 37 + 소수의 곱셈 6 + 도형의 넓이 6), 겹침 없음', L.ALL_LEVELS.length === 59 && new Set(L.ALL_LEVELS).size === 59);
 check('레벨 이름 8자 이하 (보안 규칙)', L.ALL_LEVELS.every(lv => lv.length <= 8));

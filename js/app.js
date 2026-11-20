@@ -313,10 +313,10 @@ function renderLevelButtons() {
   if (next) {
     const cfg = L.LEVEL_CONFIGS[next];
     card.innerHTML = `<span class="next-k">오늘 할 것</span>
-      <button class="next-t" data-act="card"><b>${next}</b>${cfg.label}</button>
+      <button class="next-t" data-act="card"><b>${L.levelName(next)}</b>${cfg.label}</button>
       ${Session.windowHTML(next, state.progress.recent[next] || [], false)}
       <button class="big-btn big-go" data-act="go">🔥 도전 시작</button>
-      ${second ? `<button class="next-sub" data-act="second">그다음 <b>${second}</b>${L.LEVEL_CONFIGS[second].label}</button>` : ''}`;
+      ${second ? `<button class="next-sub" data-act="second">그다음 <b>${L.levelName(second)}</b>${L.LEVEL_CONFIGS[second].label}</button>` : ''}`;
     card.querySelector('[data-act=card]').onclick = () => selectLevel(next);
     card.querySelector('[data-act=go]').onclick = () => { state.level = next; startPractice('challenge'); };
     if (second) card.querySelector('[data-act=second]').onclick = () => selectLevel(second);
@@ -350,7 +350,7 @@ function renderLevelButtons() {
       const unlocked = L.isLevelUnlocked(lv, state.progress.passed);
       const b = document.createElement('button');
       b.className = 'lv-chip ' + (lv === next ? 'now' : passed ? 'done' : skipped ? 'skip' : unlocked ? '' : 'lock');
-      b.textContent = lv + (passed ? ' ✓' : skipped ? ' ⤼' : unlocked ? '' : ' 🔒');
+      b.textContent = L.levelName(lv) + (passed ? ' ✓' : skipped ? ' ⤼' : unlocked ? '' : ' 🔒');
       b.title = L.LEVEL_CONFIGS[lv].label + (skipped ? ' (시작점 앞 — 건너뛰어도 돼요)' : '');
       b.onclick = () => selectLevel(lv);
       chips.appendChild(b);
@@ -363,7 +363,7 @@ function renderLevelButtons() {
     const tr = L.TRACKS[t];
     const head = document.createElement('div');
     head.className = 'lv-track';
-    head.textContent = tr.label + (tr.open ? ' · 언제든 풀 수 있어요' : '');
+    head.textContent = `${tr.letter}. ${tr.label}` + (tr.open ? ' · 언제든 풀 수 있어요' : '');
     container.appendChild(head);
     const groups = groupsOf(tr.levels);
     const finished = groups.filter(g => g.levels.every(isDone));
@@ -372,7 +372,8 @@ function renderLevelButtons() {
       const fold = document.createElement('details');
       fold.className = 'lv-fold';
       const first = finished[0].levels[0], lastG = finished[finished.length - 1];
-      fold.innerHTML = `<summary>끝낸 레벨 ${first}~${lastG.levels[lastG.levels.length - 1]} 보기</summary><div></div>`;
+      const last = lastG.levels[lastG.levels.length - 1];
+      fold.innerHTML = `<summary>끝낸 레벨 ${L.levelName(first)}${last !== first ? '~' + L.levelName(last) : ''} 보기</summary><div></div>`;
       finished.forEach(g => fold.lastElementChild.appendChild(groupEl(g)));
       container.appendChild(fold);
     }
@@ -383,7 +384,7 @@ function renderLevelButtons() {
 function selectLevel(lv) {
   state.level = lv;
   const cfg = L.LEVEL_CONFIGS[lv];
-  $('modeLevel').textContent = lv;
+  $('modeLevel').textContent = L.levelName(lv);
   $('modeTitle').textContent = cfg.label;
   $('modeDesc').textContent = cfg.desc;
   $('modeExample').innerHTML = exampleHTML(lv, cfg);
@@ -402,7 +403,7 @@ function selectLevel(lv) {
     btn.disabled = true;
     btn.onclick = null;
     btn.className = 'big-btn big-lock';
-    btn.innerHTML = `🔒 ${prev.level} 먼저 통과해요<small>${prev.level} 도전 최근 ${prev.size}문제 중 ${prev.need}개 · 지금 ${prev.correct}개</small>`;
+    btn.innerHTML = `🔒 ${L.levelName(prev.level)} 먼저 통과해요<small>${L.levelName(prev.level)} 도전 최근 ${prev.size}문제 중 ${prev.need}개 · 지금 ${prev.correct}개</small>`;
   }
   only('modeSelection');
 }
@@ -459,7 +460,7 @@ function renderRankingTable(tbodyId, list, emptyMsg) {
     tr.className = 'border-b hover:bg-yellow-50';
     tr.innerHTML = `<td class="px-4 py-3 text-center font-bold text-gray-700">${medal}</td>
       <td class="px-4 py-3 font-medium text-gray-900">${it.name}</td>
-      <td class="px-4 py-3 text-center"><span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">${it.level}</span></td>
+      <td class="px-4 py-3 text-center"><span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">${L.levelName(it.level)}</span></td>
       <td class="px-4 py-3 text-right font-bold text-orange-600">${it.score}<div class="text-xs font-normal text-gray-400">${it.levels}개 레벨</div></td>`;
     tb.appendChild(tr);
   });
