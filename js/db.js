@@ -8,6 +8,8 @@
  *   classes/{code}/results/{auto}      : 연습·도전 기록
  *   classes/{code}/best/{번호}         : 학생별 레벨 최고점 요약 { studentNo, best:{레벨:점수}, lastTs } — 랭킹용
  *   classes/{code}/logs/{auto}         : 접속 로그
+ *   classes/{code}/game/state          : 반 보스 설정 { on, startTs, base, coefs[], exclude[] } — 교사만 쓴다 (game.js)
+ *   classes/{code}/wallet/{번호}       : 반 보스에게 준 데미지 요약 { studentNo, dmg, startTs, lastTs } — 학생 기기가 자기 기록으로 계산해 쓴다
  *
  * ⚠️ Firestore 무료 요금제는 하루 읽기 5만 건까지다. 반 전체 기록을 자주 읽으면 금방 바닥나고,
  *    그러면 모든 읽기가 실패해 학생 기록이 '초기화'된 것처럼 보인다.
@@ -23,6 +25,7 @@ const MINE_CACHE_MS = 30 * 60 * 1000;   // 내 기록 — 저장할 때 캐시�
 const RANK_CACHE_MS = 5 * 60 * 1000;    // 랭킹 — 친구 점수는 몇 분 늦게 보여도 된다
 const ALL_CACHE_MS = 10 * 60 * 1000;    // 반 전체 기록 (교사 화면 · 랭킹 대체 경로)
 const STUDENTS_CACHE_MS = 30 * 60 * 1000;   // 명단 — 거의 바뀌지 않고, 교사가 고치면 invalidate() 로 바로 비운다
+const WALLET_CACHE_MS = 3 * 60 * 1000;  // 반 보스 — 친구들이 준 데미지는 몇 분 늦게 보여도 된다
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // 헷갈리는 O/I/L/0/1 제외
 
 let db = null, fbAuth = null, mode = 'local';
@@ -461,18 +464,18 @@ async function saveResult(code, payload, opts) {
     sent = await Promise.race([p, new Promise(res => setTimeout(() => res(null), SAVE_WAIT_MS))]);
   } catch (e) {
     console.warn('결과 저장 실패', e);
-    return { displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
+    return { ts: now, displayScore: outcome.displayScore, scoreRecorded:false, message:'점수 저장에 실패했습니다.', isError:true };
   }
   if (sent === true) flushOutbox();   // 연결이 살아 있으면 예전에 못 보낸 기록도 함께 올린다
   if (sent === 'rejected') {
-    return { displayScore: outcome.displayScore, scoreRecorded: false, isError: true,
+    return { ts: now, displayScore: outcome.displayScore, scoreRecorded: false, isError: true,
              message: '⚠️ 기록이 서버에 저장되지 않았어요. 이 기기에 남겨 두었으니 선생님께 알려 주세요.' };
   }
   if (sent !== true) {
-    return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
+    return { ts: now, displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, pending: true,
              message: '인터넷이 불안정해서 이 기기에 먼저 저장했어요. 연결되면 자동으로 올라가요.' };
   }
-  return { displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
+  return { ts: now, displayScore: outcome.displayScore, scoreRecorded: outcome.scoreRecorded, message: outcome.message };
 }
 
 /* ── 풀던 중 기록 (draft) ──
@@ -563,6 +566,118 @@ async function getProgress(code, studentNo) {
   syncBest(code, studentNo, best, lastTsOf(rows));
   const p = Levels.computeProgress(rows, scoreOf);
   return { best, passed: p.passed, recent: p.recent };
+}
+
+/* ═══ 반 보스 (규칙·계산은 game.js) ═══
+ * 설정(game/state)은 교사만 쓰고, 학생 기기는 자기 기록으로 계산한 데미지 요약(wallet/{번호})만 쓴다.
+ * 반 합계 = 번호별 요약의 합(학생 수만큼 읽기, 3분 캐시) — 반 전체 기록은 읽지 않는다.
+ * 보안 규칙을 아직 배포하지 않아 읽기·쓰기가 막히면 보스가 안 보일 뿐, 나머지 화면에는 영향이 없다. */
+const gameRef = code => db.collection('classes').doc(code).collection('game').doc('state');
+const walletCol = code => db.collection('classes').doc(code).collection('wallet');
+function cleanGame(g) {
+  if (!g || typeof g !== 'object') return null;
+  const coefs = Array.isArray(g.coefs) ? g.coefs.map(Number).filter(n => n > 0).slice(0, 60) : [];
+  return { on: !!g.on, startTs: Number(g.startTs) || 0, base: Math.max(0, Math.round(Number(g.base) || 0)),
+           coefs: coefs.length ? coefs : Game.DEFAULT_COEFS.slice(),
+           exclude: Array.isArray(g.exclude) ? g.exclude.map(String).slice(0, 40) : [] };
+}
+async function getGame(code, force) {
+  if (!code) return null;
+  if (force) delete cache['game:' + code];
+  return cached('game:' + code, async () => {
+    if (isLocal()) return cleanGame((LS.get('classes', {})[code] || {}).game);
+    try { const d = await gameRef(code).get(); return d.exists ? cleanGame(d.data()) : null; }
+    catch (e) { console.warn('반 보스 설정 읽기 실패', e); return null; }
+  });
+}
+/** 반 보스 설정 저장 — 교사 화면 */
+async function setGame(code, g) {
+  const v = cleanGame(g);
+  if (isLocal()) { const all = LS.get('classes', {}); if (all[code]) { all[code].game = v; LS.set('classes', all); } }
+  else await gameRef(code).set(v);
+  delete cache['game:' + code]; delete cache['wallets:' + code];
+  return v;
+}
+const syncedWallet = {};
+/** 내 데미지 요약 저장 — merge 로 써서 막타 기록(kills)은 지우지 않는다. lastHit = 마지막으로 보스를 깎은 시각 */
+function syncWallet(code, studentNo, dmg, startTs, lastHit) {
+  if (isLocal()) return Promise.resolve();
+  const no = String(studentNo), key = `${code}:${no}`, sig = `${startTs}:${dmg}`;
+  if (syncedWallet[key] === sig) return Promise.resolve();
+  syncedWallet[key] = sig;
+  return walletCol(code).doc(no).set({ studentNo: no, dmg, startTs, lastHit: lastHit || 0, lastTs: Date.now() }, { merge: true })
+    .catch(e => { delete syncedWallet[key]; console.warn('반 보스 데미지 저장 실패', e); });
+}
+/** 막타 기록을 내 요약에 덧붙인다 { s: 단계, ts, next: 바로 앞에 깎은 번호 } */
+function saveKill(code, studentNo, kill) {
+  const no = String(studentNo);
+  if (isLocal()) {
+    const l = LS.get(`cls.${code}.kills`, []); l.push(Object.assign({ studentNo: no }, kill)); LS.set(`cls.${code}.kills`, l.slice(-200));
+    return Promise.resolve();
+  }
+  return walletCol(code).doc(no).set({ kills: firebase.firestore.FieldValue.arrayUnion(kill) }, { merge: true })
+    .then(() => { delete cache['wallets:' + code]; })
+    .catch(e => console.warn('막타 기록 저장 실패', e));
+}
+/** 번호별 데미지 요약 [{ studentNo, dmg, startTs, lastHit, kills:[{ s, ts, next }] }] */
+async function loadWallets(code, force) {
+  if (force) delete cache['wallets:' + code];
+  return cached('wallets:' + code, async () => {
+    if (isLocal()) {   // 로컬 모드는 요약을 따로 두지 않고 기록에서 바로 계산한다
+      const game = await getGame(code), by = {}, kills = LS.get(`cls.${code}.kills`, []);
+      LS.get(`cls.${code}.results`, []).forEach(r => { (by[String(r.studentNo)] = by[String(r.studentNo)] || []).push(r); });
+      return Object.keys(by).map(no => {
+        const d = Game.damageOf(by[no], game, scoreOf);
+        return { studentNo: no, dmg: d.total, startTs: game ? game.startTs : 0, lastHit: d.events.length ? d.events[d.events.length - 1].ts : 0,
+                 kills: kills.filter(k => String(k.studentNo) === no) };
+      });
+    }
+    const snap = await walletCol(code).get();
+    return snap.docs.map(d => ({ studentNo: String(d.data().studentNo || d.id), dmg: Number(d.data().dmg) || 0, startTs: Number(d.data().startTs) || 0,
+                                 lastHit: Number(d.data().lastHit) || 0, kills: Array.isArray(d.data().kills) ? d.data().kills : [] }));
+  }, WALLET_CACHE_MS);
+}
+const KILL_FRESH_MS = 2 * 60 * 1000;   // 방금 푼 판(2분 안)만 막타인지 따진다 — 그 뒤에는 친구들 데미지가 달라져 판정이 흔들린다
+const killChecked = {};
+/** 반 보스 지금 상태 — 게임이 꺼져 있으면 null.
+ *  studentNo 를 주면 그 학생 몫은 자기 기록으로 바로 계산해 넣고(방금 푼 판까지 반영) 요약도 갱신한다.
+ *  방금 푼 판이 보스를 쓰러뜨렸으면 막타로 적는다(그때는 친구들 요약을 새로 읽어 정확히 따진다).
+ *  돌려주는 값: { game, mine:{ total, events }, total, boss, list:[{ studentNo, dmg }], kills:[{ stage, by, next, pick, ts }] } */
+async function getBoss(code, studentNo, opts) {
+  const game = await getGame(code, opts && opts.force);
+  if (!Game.isOn(game)) return null;
+  const no = studentNo == null ? '' : String(studentNo);
+  let mine = { total: 0, events: [] };
+  if (no && !Game.isExcluded(game, no)) {
+    mine = Game.damageOf(await loadMyResults(code, no), game, scoreOf);
+    if (mine.total > 0) await syncWallet(code, no, mine.total, game.startTs, mine.events[mine.events.length - 1].ts);
+  }
+  const fresh = mine.events.filter(e => Date.now() - e.ts < KILL_FRESH_MS && !killChecked[`${code}:${no}:${e.ts}`]);
+  let wallets = [];
+  try { wallets = await loadWallets(code, (opts && opts.force) || fresh.length > 0); } catch (e) { console.warn('반 보스 데미지 읽기 실패', e); }
+  const counted = wallets.filter(w => w.startTs === game.startTs && !Game.isExcluded(game, w.studentNo));
+  const others = counted.filter(w => w.studentNo !== no && w.dmg > 0);
+  const list = others.map(w => ({ studentNo: w.studentNo, dmg: w.dmg }));
+  if (mine.total > 0) list.push({ studentNo: no, dmg: mine.total });
+  const r2 = v => Math.round(v * 100) / 100;
+  const total = r2(list.reduce((a, w) => a + w.dmg, 0));
+  const claims = [];
+  counted.forEach(w => w.kills.forEach(k => claims.push({ studentNo: w.studentNo, s: k.s, ts: k.ts, next: k.next })));
+  // 방금 푼 판이 보스를 쓰러뜨렸는가 — 내 데미지를 그 판까지만 더해 본다
+  const othersSum = others.reduce((a, w) => a + w.dmg, 0);
+  let run = 0;
+  mine.events.forEach(e => {
+    run += e.dmg;
+    if (fresh.indexOf(e) === -1) return;
+    killChecked[`${code}:${no}:${e.ts}`] = true;
+    const before = Game.bossOf(r2(othersSum + run - e.dmg), game), after = Game.bossOf(r2(othersSum + run), game);
+    if (after.killed <= before.killed || claims.some(c => Number(c.s) === before.stage && c.ts >= game.startTs)) return;
+    const prev = others.filter(w => w.lastHit > 0).sort((a, b) => b.lastHit - a.lastHit)[0];
+    const kill = { s: before.stage, ts: e.ts, next: prev ? prev.studentNo : '' };
+    claims.push(Object.assign({ studentNo: no }, kill));
+    saveKill(code, no, kill);
+  });
+  return { game, mine, total, boss: Game.bossOf(total, game), list, kills: Game.resolveKills(claims, game.startTs) };
 }
 
 async function getHistory(code, studentNo) {
@@ -714,22 +829,24 @@ async function getAccessAlerts(code) {
 async function clearRecords(code, onProgress) {
   let removed = { results: 0, logs: 0, logsBlocked: false };
   Object.keys(syncedBest).forEach(k => { if (k.startsWith(code + ':')) delete syncedBest[k]; });
+  Object.keys(syncedWallet).forEach(k => { if (k.startsWith(code + ':')) delete syncedWallet[k]; });
   if (isLocal()) {
     removed.results = LS.get(`cls.${code}.results`, []).length;
     removed.logs = LS.get(`cls.${code}.logs`, []).length;
     LS.set(`cls.${code}.results`, []);
     LS.set(`cls.${code}.logs`, []);
+    LS.del(`cls.${code}.kills`);
     invalidate();
     return removed;
   }
-  for (const col of ['results', 'best', 'logs']) {
+  for (const col of ['results', 'best', 'wallet', 'logs']) {
     try {
       for (;;) {
         const snap = await db.collection('classes').doc(code).collection(col).limit(300).get();
         if (!snap.docs.length) break;
         for (const d of snap.docs) {
           await db.collection('classes').doc(code).collection(col).doc(d.id).delete();
-          if (col !== 'best') removed[col]++;
+          if (col === 'results' || col === 'logs') removed[col]++;
           if (onProgress) onProgress(removed);
         }
         if (snap.docs.length < 300) break;
@@ -739,7 +856,7 @@ async function clearRecords(code, onProgress) {
       // 점수와 무관하고 24시간 뒤 감시 대상에서 빠지므로 나머지는 계속 진행한다.
       // best(랭킹 요약) 삭제가 막혀도, 학생이 다시 접속하거나 교사 랭킹 탭을 열면 바른 값으로 덮어쓴다.
       if (col === 'logs') removed.logsBlocked = true;
-      else if (col === 'best') { /* 무시 */ }
+      else if (col === 'best' || col === 'wallet') { /* 무시 — wallet(반 보스 요약)은 학생이 다시 접속하면 기록으로 다시 계산된다 */ }
       else throw e;
     }
   }
@@ -762,6 +879,7 @@ return {
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
+  getGame, setGame, getBoss,
   getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getBasicProgress, getAccessAlerts, clearRecords
 };
 })();

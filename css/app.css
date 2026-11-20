@@ -246,3 +246,20 @@ body.num-wide .app-shell{max-width:64rem}
 .bb-try{color:var(--c-main-dark)}
 .bb-skip{color:#cbd5e1}
 .bb-now{box-shadow:inset 0 0 0 2px var(--c-main);border-radius:.4rem}
+
+/* ══ 반 보스 (2026-11-20) — 보상 색(reward)은 바탕·테두리에만, 글자는 reward-ink ══ */
+.boss-band{display:flex;gap:.75rem;align-items:center;background:#fff;border:1px solid #FCD34D;border-radius:1rem;padding:.7rem .85rem}
+.boss-face{flex:none;width:3rem;height:3rem;border-radius:.8rem;background:#FEF3C7;display:flex;align-items:center;justify-content:center;font-size:1.7rem}
+.boss-main{flex:1;min-width:0}
+.boss-k{font-size:.75rem;font-weight:800;color:var(--c-reward-ink)}
+.boss-n{font-size:1rem;font-weight:900;color:#1f2937}
+.boss-hp{height:.75rem;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;overflow:hidden;margin-top:.3rem}
+.boss-hp i{display:block;height:100%;background:linear-gradient(90deg,#F59E0B,var(--c-reward));border-radius:999px;transition:width .6s}
+.boss-num{font-size:.75rem;color:#64748b;margin-top:.2rem;font-variant-numeric:tabular-nums}
+.boss-num b{color:#1f2937}
+.boss-hit{background:#FFFBEB;border:1px solid #FCD34D;border-radius:1rem;padding:.6rem .85rem;margin-bottom:1rem;text-align:left}
+.boss-hit-k{font-size:.95rem;font-weight:900;color:#1f2937}
+.boss-hit-k b{color:var(--c-no)}
+.boss-hit-why{font-size:.72rem;font-weight:700;color:var(--c-reward-ink);margin-left:.25rem}
+.boss-last{margin-top:.4rem;padding-top:.4rem;border-top:1px dashed #FCD34D;font-size:.85rem;font-weight:800;color:var(--c-reward-ink)}
+.boss-last b{color:#1f2937}
