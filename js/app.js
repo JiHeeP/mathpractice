@@ -8,7 +8,6 @@ const state = {
   level: null, bestScores: {},
   basicStart: {},   // 번호별 기초 트랙 시작점 — 교사 화면 설정에서 정한다(반 문서 basicStart). 없으면 시작점 없음
   progress: { passed: {}, recent: {} },   // 통과한 레벨 · 레벨별 최근 문제 정오 (규칙은 levels.js)
-  boss: null,          // 반 보스 지금 상태 (DB.getBoss) — 게임이 꺼져 있으면 null
   loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
 };
 
@@ -226,8 +225,7 @@ function backToStudents() {
 
 /* ═══ 레벨 ═══ */
 function loadLevels() {
-  // 반 보스는 기록을 읽은 뒤에 계산한다(같은 기록 캐시를 쓴다). 실패해도 레벨 화면은 그대로 뜬다
-  Promise.all([fetchBestScores().then(fetchBoss), refreshBasicStart()]).then(() => { renderLevelButtons(); only('levelSelection'); });
+  Promise.all([fetchBestScores(), refreshBasicStart()]).then(() => { renderLevelButtons(); only('levelSelection'); });
 }
 
 /** 기초 시작점을 반 문서에서 다시 읽는다 — 선생님이 설정을 바꾼 뒤 학생이 반에 다시 들어오지 않아도 반영되게.
@@ -237,26 +235,6 @@ function refreshBasicStart() {
   return DB.getClass(state.classCode)
     .then(cls => { if (cls) state.basicStart = cls.basicStart || {}; })
     .catch(() => {});
-}
-
-/** 반 보스 상태 읽기 — 게임이 꺼져 있거나 읽기에 실패하면 띠를 그리지 않는다 */
-function fetchBoss() {
-  if (!state.classCode || !state.studentNo) { state.boss = null; return Promise.resolve(); }
-  return DB.getBoss(state.classCode, state.studentNo)
-    .then(b => { state.boss = b; })
-    .catch(e => { console.warn('반 보스 읽기 실패', e); state.boss = null; });
-}
-
-/** 반 보스 띠 — '오늘 할 것' 카드 위에 한 줄. 학생 화면에는 반 전체 체력만 보여 준다(친구별 데미지는 교사 화면에만) */
-function bossBandHTML(b) {
-  const boss = b.boss, pct = Math.max(0, Math.min(100, (boss.hp / boss.max) * 100));
-  return `<div class="boss-face" aria-hidden="true">${boss.icon}</div>
-    <div class="boss-main">
-      <div class="boss-k">우리 반 보스 · ${boss.stage}단계</div>
-      <div class="boss-n">${boss.name}</div>
-      <div class="boss-hp" role="img" aria-label="남은 체력 ${Game.fmt(boss.hp)} / ${boss.max}"><i style="width:${pct}%"></i></div>
-      <div class="boss-num">남은 체력 <b>${Game.fmt(boss.hp)}</b> / ${boss.max}${b.mine.total > 0 ? ` · 내가 깎은 체력 ${Game.fmt(b.mine.total)}` : ''}</div>
-    </div>`;
 }
 
 /** 최고점 읽기. 실패하면 빈 기록으로 덮지 않는다 — 화면에 있던 점수나 기기 백업을 그대로 쓴다.
@@ -333,13 +311,6 @@ function renderLevelButtons() {
     warn.innerHTML = `⚠️ 기록을 불러오지 못했어요. ${hasAny ? '이 기기에 남아 있던 마지막 기록을 보여 주고 있어요.' : '잠겨 보여도 기록은 지워지지 않았어요.'}
       <button class="mt-2 w-full py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition" onclick="App.retryLoadLevels()">🔄 다시 불러오기</button>`;
     container.appendChild(warn);
-  }
-
-  if (state.boss) {
-    const band = document.createElement('div');
-    band.className = 'boss-band';
-    band.innerHTML = bossBandHTML(state.boss);
-    container.appendChild(band);
   }
 
   const today = todayLevels();
@@ -475,7 +446,7 @@ function startPractice(mode) {
 function backToLevels(after) {
   // 방금 저장한 기록은 db.js 가 캐시에 덧붙여 두므로 캐시를 비우지 않는다 (비우면 기록을 전부 다시 읽음)
   const lv = state.level;
-  Promise.all([fetchBestScores().then(fetchBoss), refreshBasicStart()]).then(() => {
+  Promise.all([fetchBestScores(), refreshBasicStart()]).then(() => {
     renderLevelButtons();
     if (after === 'again' && lv) { state.level = lv; startPractice('challenge'); }
     else if (after === 'next' && levelAfter(lv)) selectLevel(levelAfter(lv));
