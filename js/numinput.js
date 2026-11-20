@@ -10,9 +10,11 @@
  *   - 한 자리 답(auto, B5): 숫자 하나를 누르면 바로 채점한다(확인 키 없음)
  *   - 세로셈(vert, B1~B4): 문제를 세로로 쓰고, 답은 자릿수 칸에 채운다.
  *     B1(뺄셈, vert.rtl)만 일의 자리부터 왼쪽으로, B2~B4 는 앞(높은 자리)부터 오른쪽으로
- *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄(채점하지 않음, 맨 아래 답만 채점)
+ *   - 도움 칸(학생이 켤 때만): B9 는 '□ × □ = n' 짝 줄, B4 는 부분곱 두 줄.
+ *     켠 도움 칸도 채점한다 — 도움 칸과 답이 모두 맞아야 정답(선생님 결정 2026-11-20). 비워 두면 확인 때 그 칸으로 간다
+ *     B4 둘째 줄(십의 자리 부분곱)은 한 칸 밀려 있으니 1170 이 정답, 끝에 0 을 붙인 11700 도 정답
  *   - 소수(dec, D1~D5): 숫자판에 소수점(.) 키. 빈 칸에서 누르면 '0.' 이 된다. 값이 같으면 정답(6.0 · 1.20 도 정답,
- *     대신 '끝자리 0은 지워요' 안내 — 선생님 결정 2026-11-18). D1~D4 도움 칸: '자연수처럼 곱하면 □ → 소수점 아래 □자리'
+ *     대신 '끝자리 0은 지워요' 안내 — 선생님 결정 2026-11-18). D1~D4 도움 칸: '자연수처럼 곱하면 □ → 소수점 아래 □자리'(켜면 이것도 채점)
  *   - 넓이(unit, A1~A6): 위에 도형 그림, 아래 '넓이 = □ cm²'. 단위는 미리 적혀 있고 숫자만 쓴다
  * 계산은 학생이 한다. 화면은 칸 옮기기·지우기만 돕는다.
  * 4지선다와 달리 찍을 수 없으므로 오답 시간 페널티는 두지 않는다.
@@ -37,7 +39,7 @@ function init(lv, mode, config, onExit) {
   next();
 }
 
-/* 칸 목록 — { f: 몇 번째 field, v: 쓴 수(문자열), k: 'n' 수 | 'd' 자릿수 한 칸 | 'opt' 도움 칸(채점 안 함) } */
+/* 칸 목록 — { f: 몇 번째 field, v: 쓴 수(문자열), k: 'n' 수 | 'd' 자릿수 한 칸 | 'opt' 도움 칸(켰을 때만 있음, 채점함) } */
 function makeBoxes() {
   const out = [];
   prob.fields.forEach((f, i) => {
@@ -159,7 +161,7 @@ function paint() {
 
 /** '다음 칸'을 누르면 갈 곳 — 칸 번호, 'new'(약수 칸 하나 더), null(남은 칸이 없으니 확인) */
 function target() {
-  const need = b => !isGrow(b) && boxes[b].k !== 'opt' && !boxes[b].v;   // 꼭 채워야 하는 빈 칸
+  const need = b => !isGrow(b) && !boxes[b].v;            // 꼭 채워야 하는 빈 칸(켠 도움 칸 포함)
   if (boxes[cur].k === 'opt') {                             // 도움 칸 → 다음 도움 칸 → 답의 첫 빈 자릿수 칸
     if (boxes[cur + 1] && boxes[cur + 1].k === 'opt') return cur + 1;
     const e = firstEmptyDigit(); if (e !== -1) return e;
@@ -219,12 +221,26 @@ function press(k) {
   paint();
 }
 
+/** 도움 칸 r번째(0, 1)의 정답 목록 — B4 부분곱(일의 자리 · 십의 자리), D1~D4 자연수처럼 곱한 값 · 소수점 아래 자릿수 */
+function optAns(r) {
+  const f = prob.fields[0];
+  if (f.vert) {
+    const { a, b } = f.vert, p = a * (r === 0 ? b % 10 : Math.floor(b / 10) % 10);
+    return r === 0 ? [p] : [p, p * 10];                    // 둘째 줄은 한 칸 밀어 쓴 1170 · 0 까지 쓴 11700 모두 정답
+  }
+  return [r === 0 ? f.raw : f.places];
+}
+const optText = () => {
+  const f = prob.fields[0];
+  return f.vert ? `부분곱 <b>${optAns(0)[0]}</b> · <b>${optAns(1)[0]}</b>` : `자연수처럼 곱하면 <b>${f.raw}</b> · 소수점 아래 <b>${f.places}</b>자리`;
+};
 /** 칸마다 맞았나(ok/no). list 는 순서 상관없이 정답 목록에 있는 수면 ok */
 function judge() {
-  const ds = boxes.filter(x => x.k === 'd');
+  const ds = boxes.filter(x => x.k === 'd'), os = boxes.filter(x => x.k === 'opt');
   return boxes.map(x => {
     const f = prob.fields[x.f];
-    if (!x.v || x.k === 'opt') return '';
+    if (!x.v) return '';
+    if (x.k === 'opt') return optAns(os.indexOf(x)).includes(Number(x.v)) ? 'ok' : 'no';
     if (x.k === 'd') return String(f.ans)[ds.indexOf(x)] === x.v ? 'ok' : 'no';
     return (f.list ? f.ans.includes(Number(x.v)) : Number(x.v) === f.ans) ? 'ok' : 'no';
   });
@@ -242,7 +258,7 @@ const ansText = f => (f.list ? f.ans.join(', ') : String(f.ans)) + (f.unit ? ' '
 
 function submit() {
   // 꼭 채워야 할 칸이 비었으면 그 칸으로 옮기기만 한다 (실수로 확인을 눌러 틀리지 않게)
-  const empty = boxes.findIndex((x, b) => !x.v && !isGrow(b) && x.k !== 'opt');
+  const empty = boxes.findIndex((x, b) => !x.v && !isGrow(b));   // 켠 도움 칸도 채워야 한다
   if (empty !== -1) { cur = empty; paint(); return; }
   const fb = document.getElementById('numFb');
   if (prob.fields.some((f, i) => f.grow && !boxes.some(x => x.f === i && x.v))) {
@@ -256,12 +272,14 @@ function submit() {
   }
   waiting = true;
   marks = judge();
-  const ok = prob.fields.every((f, i) => fieldOK(i));
+  const hasOpt = boxes.some(x => x.k === 'opt');
+  const ok = prob.fields.every((f, i) => fieldOK(i)) && !marks.includes('no');   // 켠 도움 칸이 틀려도 오답
   // 소수 답에 끝자리 0(6.0 · 1.20)이나 끝에 소수점만(6.)을 남겼으면 정답으로 하되 고쳐 쓰는 법을 알려 준다
   const tail = ok && isDec() && boxes.some(x => x.k === 'n' && /\.(\d*0)?$/.test(x.v));
   fb.innerHTML = tail ? `<span class="t-ok">정답입니다! ⭕</span><div class="text-base text-gray-700 mt-1">소수 끝자리 0은 지워서 <b>${ansText(prob.fields[0])}</b>${uro(prob.fields[0].ans)} 써요</div>`
     : ok ? '<span class="t-ok">정답입니다! ⭕</span>'
     : `<span class="t-no">틀렸습니다 ❌</span><div class="text-base text-gray-700 mt-1">정답: ${
+        (hasOpt ? optText() + ' · 답 ' : '') +
         prob.fields.map(f => (f.label ? f.label + ' ' : '') + `<b>${ansText(f)}</b>`).join(' · ')}</div>`;
   paint();
   const done = Session.problemDone(ok);
