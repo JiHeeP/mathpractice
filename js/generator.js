@@ -807,7 +807,7 @@ function genMultiples() {
  * 소수를 { v: 정수값, p: 소수점 아래 자릿수 } 로 다룬다(decimal.js) — 부동소수점 오차 없음.
  * 숫자 입력 문제 = { display, fields: [{ label:'', ans: 숫자, dec: true, raw, places }] }
  *   ans    : 정답(끝자리 0을 지운 값). 학생이 6.0 · 1.20 처럼 써도 값이 같으면 정답(선생님 결정 2026-11-18)
- *   raw/places : 자연수처럼 곱한 값 · 소수점 아래 자릿수 — 도움 칸 정답 안내용(채점 안 함)
+ *   raw/places : 자연수처럼 곱한 값 · 소수점 아래 자릿수 — 도움 칸 정답(켜면 채점, numinput.js)
  */
 /** 끝자리가 0이 아닌 p자리 소수, 정수 부분은 0 ~ maxWhole */
 function decP(p, maxWhole, minV) {
