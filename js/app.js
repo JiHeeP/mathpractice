@@ -271,31 +271,24 @@ function retryLoadLevels() {
   loadLevels();
 }
 
-/** 분수·소수 트랙에서 할 것 — 아직 통과하지 못한 레벨 중 도전이 열린 첫 레벨. 다 통과했으면 null */
-function nextLevel() {
-  return L.LEVEL_ORDER.find(lv => !state.progress.passed[lv] && L.isLevelUnlocked(lv, state.progress.passed)) || null;
-}
 /** 같은 트랙(기초는 같은 줄)에서 바로 다음 레벨 (결과 화면의 '다음 레벨로' 버튼) */
 function levelAfter(lv) { return L.nextInTrack(lv); }
 
 /* ═══ 기초 트랙 시작점 ═══
  * 반 문서의 basicStart = { '번호': { sub, mul, div, g } }  (값: 'B1'~'B8' 또는 '-' = 그 줄은 통과)
- * 약수와 배수(B9·B10)는 모두가 거친다. 묶음 g: 가 = 기초만(B3 통과 전까지), 나 = 기초 먼저, 다·라 = 분수 먼저
+ * 약수와 배수(B9·B10)는 모두가 거친다. 묶음 g(가·나·다·라)는 기록용 — 지금은 기초를 다 끝내야 다음 트랙이 보인다(2026-11-20)
  */
 const myStart = () => state.basicStart[String(state.studentNo)] || null;
 const isSkippedByStart = lv => L.basicSkipped(myStart(), lv);
-const doneBasic = lv => !!state.progress.passed[lv] || isSkippedByStart(lv);
 const nextBasic = () => L.nextBasicLevel(myStart(), state.progress.passed);
-/** 오늘 할 것 — [첫째, 둘째] (없으면 빠짐)
- *  통과 못 한 기초 레벨이 있으면 묶음과 상관없이 무조건 첫째로 띄운다(선생님 결정 2026-11-17).
- *  기초 연산이 남아 있는 동안에는 기초 연산만 보여 준다(선생님 결정 2026-11-20) — 둘째 줄('그다음')도,
- *  아래의 분수·소수의 곱셈·도형의 넓이 메뉴도 띄우지 않는다. 기초를 다 끝내면 나머지가 나타난다. */
+/** 지금 푸는 트랙과 그 트랙에서 할 레벨 — 규칙은 levels.js currentTrack · nextInTrackFor */
+const currentTrack = () => L.currentTrack(myStart(), state.progress.passed);
+const nextInCurrent = t => L.nextInTrackFor(t, myStart(), state.progress.passed);
+/** 오늘 할 것 — 지금 트랙의 레벨 하나('그다음' 줄 없음). 다 끝냈으면 빈 목록 */
 function todayLevels() {
-  const b = nextBasic(), f = nextLevel();
-  return (b ? [b] : [f]).filter(Boolean);
+  const t = currentTrack();
+  return t ? [nextInCurrent(t)].filter(Boolean) : [];
 }
-/** 기초 연산을 하는 중인가 — 그동안 레벨 화면에는 기초 연산 메뉴만 보인다 */
-const basicOnly = () => !!nextBasic();
 
 /** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
  *  잠긴 레벨도 누르면 카드에서 무엇을 먼저 통과해야 하는지 보여 준다. 잠금 계산은 levels.js 그대로.
@@ -365,7 +358,8 @@ function renderLevelButtons() {
     return el;
   };
 
-  L.TRACK_KEYS.filter(t => !basicOnly() || L.TRACKS[t].open).forEach(t => {
+  const cur = currentTrack();
+  L.TRACK_KEYS.filter(t => !cur || t === cur).forEach(t => {
     const tr = L.TRACKS[t];
     const head = document.createElement('div');
     head.className = 'lv-track';
