@@ -59,6 +59,8 @@ check('B3(10문제) = 한 판 10문제 · 9개 통과 · 2개 틀리면 다시',
 check('B3 예전 20문제 판: 9개 맞히고 3개 틀린 판은 통과 아님', !prog([row('B3', 'aborted', '1111111110100')]).passed.B3);
 check('B3 예전 20문제 판: 18개 맞힌 판은 그대로 통과', !!prog([row('B3', 'aborted', '1'.repeat(18))]).passed.B3);
 check('B3 새 10문제 판: 9개 맞히면 통과 · 8개는 아님', !!prog([row('B3', 'aborted', '1111111110')]).passed.B3 && !prog([row('B3', 'aborted', '1111111100')]).passed.B3);
+check('B7(10문제, 2026-11-19) = 9개 통과 · 2개 틀리면 다시 · 문제당 35초', L.LEVEL_CONFIGS.B7.chalQ === 10 && L.LEVEL_CONFIGS.B7.chalTime === 350 && L.passWindow('B7').need === 9 && L.failAt('B7') === 2);
+check('B7 예전 20문제 판: 10개 맞히고 3개 틀린 판은 통과 아님', !prog([row('B7', 'aborted', '1111111111000')]).passed.B7);
 check('교사 화면 분모: B3 새 판 /10 · 예전 판 /20 · B1 /20', L.shownSize('B3', [1,1,1]) === 10 && L.shownSize('B3', new Array(13).fill(1)) === 20 && L.shownSize('B1', [1]) === 20);
 
 console.log('문제 만들기 (레벨마다 2,000문제)');

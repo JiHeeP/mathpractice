@@ -25,7 +25,7 @@ check('D2~D6 은 앞 레벨을 통과해야 열림', ['D2','D3','D4','D5','D6'].
 }));
 check('분수 트랙 통과(L36)로 D 레벨이 열리지 않음', !L.isLevelUnlocked('D2', { L36: true }));
 check('D 레벨은 최근 문제 창 규칙(한 판 규칙 아님)', ['D1','D4','D6'].every(lv => !L.isRunRule(lv)));
-check('통과 창: D1 20문제 중 18개 · D4 10문제 중 9개', L.passWindow('D1').need === 18 && L.passWindow('D4').size === 10 && L.passWindow('D4').need === 9);
+check('통과 창: D1 20문제 중 18개 · D3·D4 10문제 중 9개', L.passWindow('D1').need === 18 && ['D3','D4'].every(lv => L.passWindow(lv).size === 10 && L.passWindow(lv).need === 9));
 check('만점 100 · 이름 8자 이하', L.DMUL_ORDER.every(lv => L.LEVEL_MAX[lv] === 100 && lv.length <= 8));
 check('랭킹 순서(LEVEL_ORDER)에 들어가지 않음', L.DMUL_ORDER.every(lv => L.LEVEL_ORDER.indexOf(lv) === -1));
 check('다음 레벨: D5 → D6, D6 → 없음', L.nextInTrack('D5') === 'D6' && L.nextInTrack('D6') === null);
