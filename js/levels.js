@@ -514,11 +514,26 @@ function formatBasicStart(map) {
     .map(no => { const e = map[no]; return [no, e.sub, e.mul, e.div, e.g || ''].join(' ').trim(); }).join('\n');
 }
 
+/* ═══ 학생 화면에 보이는 트랙 (선생님 결정 2026-11-20) ═══
+ * 지금 푸는 트랙 하나만 보인다. 순서: 기초 연산 → 분수·소수 → 소수의 곱셈 → 도형의 넓이.
+ * 통과 못 한 레벨이 남은 첫 트랙이 '지금'. 기초는 시작점(basicStart)을 따른다.
+ * 모든 트랙을 끝냈으면 null — 그때는 전부 보여 다시 풀 수 있게 한다. */
+function currentTrack(start, passed) {
+  if (nextBasicLevel(start, passed || {})) return 'basic';
+  return TRACK_KEYS.find(t => !TRACKS[t].open && TRACKS[t].levels.some(lv => !(passed && passed[lv]))) || null;
+}
+/** 그 트랙에서 지금 할 레벨 — 기초는 시작점 규칙, 나머지는 아직 통과 못 한 레벨 중 열린 첫 레벨 */
+function nextInTrackFor(track, start, passed) {
+  if (!track) return null;
+  if (track === 'basic') return nextBasicLevel(start, passed || {});
+  return TRACKS[track].levels.find(lv => !(passed && passed[lv]) && isLevelUnlocked(lv, passed)) || null;
+}
+
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
-  trackOf, prevInTrack, nextInTrack, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
+  trackOf, prevInTrack, nextInTrack, currentTrack, nextInTrackFor, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
   passWindow, windowCorrect, windowPassed, computeProgress,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass
