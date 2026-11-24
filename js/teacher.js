@@ -122,13 +122,14 @@ function copyLink() {
 
 function switchTab(tab) {
   currentTab = tab;
-  ['comparison','basic','ranking','settings'].forEach(t => {
+  ['today','comparison','basic','ranking','settings'].forEach(t => {
     $(`tpanel-${t}`).classList.toggle('hidden', t !== tab);
     $(`ttab-${t}`).classList.toggle('ttab-on', t === tab);
   });
   if (tab === 'settings') { loadStudents(); renderOffDays(); renderBasicStart(); }
   if (tab === 'ranking') loadRanking();
   if (tab === 'basic') loadBasic();
+  if (tab === 'today') loadToday();
   if (tab === 'comparison') { initCompareDates(); loadComparison(); }
 }
 
@@ -289,6 +290,38 @@ function loadBasic(force) {
   $('tTrackLegend').classList.toggle('hidden', gridTrack === 'basic');
   if (gridTrack === 'basic') return loadBasicGrid(force);
   return loadTrackGrid(gridTrack, force);
+}
+
+/* ═══ 오늘 — 번호 순 표: 지금 레벨 · 지난번 → 오늘 맞힌 개수 · 오늘 목표 · 오늘 통과 여부 (기준은 levels.js todayGoal) ═══ */
+function loadToday(force) {
+  const tb = $('tTodayBody'), code = currentClass.code;
+  tb.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr>';
+  DB.getToday(code, currentClass.basicStart, force).then(list => {
+    if (currentTab !== 'today' || !currentClass || currentClass.code !== code) return;
+    let nDone = 0, nTry = 0, nNone = 0;
+    const md = d => d ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : '';
+    tb.innerHTML = list.map(it => {
+      const g = it.goal;
+      if (!g) return `<tr class="border-b"><td class="px-3 py-2 text-center font-bold">${esc(it.no)}</td>
+        <td class="px-3 py-2 text-slate-400" colspan="5">모든 레벨 끝냄</td></tr>`;
+      const lv = `<b>${g.level}</b> <span class="text-xs text-slate-500">${esc(Levels.LEVEL_CONFIGS[g.level].label)}</span>`;
+      const prev = g.first ? '<span class="text-slate-400">처음</span>' : `<b>${g.prev}</b>/${g.size} <span class="text-xs text-slate-400">${md(g.prevDate)}</span>`;
+      const now = g.passed ? `<b class="t-ok">${g.solved ? g.best + '/' + g.size : '통과'}</b>` : g.solved ? (g.first ? `${g.solved}문제 풂` : `<b>${g.best}</b>/${g.size}`) : '<span class="text-slate-400">-</span>';
+      const goal = g.first ? `${g.size}문제 풀기` : `${g.goal}개`;
+      let st, cls;
+      if (g.done) { st = g.passed ? '✓ 통과' : '✓ 달성'; cls = 'td-st-done'; nDone++; }
+      else if (it.today) { st = g.solved ? '아직' : '다른 레벨만'; cls = 'td-st-try'; nTry++; }
+      else { st = '기록 없음'; cls = 'td-st-none'; nNone++; }
+      return `<tr class="border-b hover:bg-slate-50">
+        <td class="px-3 py-2 text-center font-bold text-slate-700">${esc(it.no)}</td>
+        <td class="px-3 py-2">${lv}</td>
+        <td class="px-3 py-2 text-right whitespace-nowrap">${prev}</td>
+        <td class="px-3 py-2 text-right whitespace-nowrap">${now}</td>
+        <td class="px-3 py-2 text-right whitespace-nowrap">${goal}</td>
+        <td class="px-3 py-2 text-center whitespace-nowrap"><span class="td-st ${cls}">${st}</span></td></tr>`;
+    }).join('') || '<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">학생이 없습니다.</td></tr>';
+    $('tTodaySummary').textContent = `${DB.dateKey(new Date())} 기준 · 달성 ${nDone}명 · 아직 ${nTry}명 · 기록 없음 ${nNone}명 · 결석은 따로 빼지 않습니다.`;
+  }).catch(() => { tb.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-red-500">불러오기 실패</td></tr>'; });
 }
 
 /* 소수의 곱셈 · 도형의 넓이 — 번호 × 레벨. ✓ 통과 · 15/20 최근 문제 창 정답 수 · 테두리 = 지금 할 레벨(열린 레벨 중 통과 못 한 첫 레벨) */
@@ -487,6 +520,6 @@ function esc(s) {
 return {
   autoRoute, showLogin, exitToStudent, toggleMode, submitAuth, resetPassword, logout,
   createClass, backHome, copyLink, switchTab,
-  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, setGridTrack, printCards
+  saveStudent, bulkImport, clearRecords, loadRanking, loadComparison, updateCompareHeaders, compareDateChanged, setCompareAuto, saveOffDays, saveBasicStart, loadBasic, loadToday, setGridTrack, printCards
 };
 })();

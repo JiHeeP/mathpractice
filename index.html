@@ -138,10 +138,30 @@
   <div id="tCopyMsg" class="text-center text-sm text-emerald-600 font-bold min-h-6 mt-1 mb-2"></div>
 
   <div class="mb-4 flex flex-wrap gap-2">
+    <button id="ttab-today" class="ttab" onclick="Teacher.switchTab('today')">오늘</button>
     <button id="ttab-comparison" class="ttab ttab-on" onclick="Teacher.switchTab('comparison')">학생 비교</button>
     <button id="ttab-basic" class="ttab" onclick="Teacher.switchTab('basic')">트랙 현황</button>
     <button id="ttab-ranking" class="ttab" onclick="Teacher.switchTab('ranking')">랭킹</button>
     <button id="ttab-settings" class="ttab" onclick="Teacher.switchTab('settings')">설정</button>
+  </div>
+
+  <!-- 오늘 — 학생 카드의 '오늘 목표'와 같은 기준 (번호만) -->
+  <div id="tpanel-today" class="hidden">
+    <div class="flex items-center justify-between gap-3 mb-2">
+      <p class="text-xs text-slate-500">학생 화면의 '오늘 목표'와 같은 기준입니다(학급 관리 사이트의 '오늘 했다'와 같음). 오늘 할 레벨을 통과하거나, 지난번보다 1개 더 맞히면(처음 푸는 레벨은 끝까지 풀면) 달성. 숫자는 맞힌 개수(연속 10·20문제 중 가장 많이 맞힌 수)입니다.
+        지난 기록까지 봐야 해서 반 전체 기록을 읽습니다 — 10분 동안은 다시 읽지 않아요.</p>
+      <button class="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition whitespace-nowrap" onclick="Teacher.loadToday(true)">새로 고침</button>
+    </div>
+    <div class="overflow-x-auto rounded-xl border border-slate-300 bg-white">
+      <table class="w-full text-sm text-left text-gray-700">
+        <thead class="text-xs text-slate-800 bg-slate-200"><tr>
+          <th class="px-3 py-2 text-center w-14">번호</th><th class="px-3 py-2">지금 하는 레벨</th>
+          <th class="px-3 py-2 text-right whitespace-nowrap">지난번</th><th class="px-3 py-2 text-right whitespace-nowrap">오늘</th>
+          <th class="px-3 py-2 text-right whitespace-nowrap">오늘 목표</th><th class="px-3 py-2 text-center whitespace-nowrap">오늘 통과</th></tr></thead>
+        <tbody id="tTodayBody"><tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">불러오는 중...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="tTodaySummary" class="mt-2 text-xs text-slate-500"></div>
   </div>
 
   <!-- 기초 연산 통과 현황 -->

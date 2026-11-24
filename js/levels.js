@@ -575,7 +575,6 @@ function todayGoal(rows, start, today, scoreOf) {
   if (!level) return null;
   const w = passWindow(level);
   const g = { level, size: w.size, need: w.need, passed: false, done: false, first: false, goal: 0, best: 0, solved: 0, prev: null, prevDate: '' };
-  if (computeProgress(rows, scoreOf).passed[level]) { g.passed = g.done = true; return g; }
   const hits = hitsByDate(rows, level), now = hits[today];
   if (now) { g.best = now.c; g.solved = now.n; }
   const prevDate = Object.keys(hits).filter(d => d < today && hits[d].s === w.size).sort().pop();
@@ -587,6 +586,7 @@ function todayGoal(rows, start, today, scoreOf) {
     g.first = true; g.goal = w.size;
     g.done = !!now && now.n >= w.size;
   }
+  if (computeProgress(rows, scoreOf).passed[level]) g.passed = g.done = true;   // 오늘 통과 (점수 없는 일찍 통과 포함)
   return g;
 }
 
