@@ -306,8 +306,8 @@ function loadToday(force) {
         <td class="px-3 py-2 text-slate-400" colspan="5">모든 레벨 끝냄</td></tr>`;
       const lv = `<b>${g.level}</b> <span class="text-xs text-slate-500">${esc(Levels.LEVEL_CONFIGS[g.level].label)}</span>`;
       const prev = g.first ? '<span class="text-slate-400">처음</span>' : `<b>${g.prev}</b>/${g.size} <span class="text-xs text-slate-400">${md(g.prevDate)}</span>`;
-      const now = g.passed ? `<b class="t-ok">${g.solved ? g.best + '/' + g.size : '통과'}</b>` : g.solved ? (g.first ? `${g.solved}문제 풂` : `<b>${g.best}</b>/${g.size}`) : '<span class="text-slate-400">-</span>';
-      const goal = g.first ? `${g.size}문제 풀기` : `${g.goal}개`;
+      const now = g.passed ? `<b class="t-ok">${g.solved ? g.best + '/' + g.size : '통과'}</b>` : g.solved ? `<b>${g.best}</b>/${g.size}` : '<span class="text-slate-400">-</span>';
+      const goal = g.first ? '1판 풀기' : Levels.goalText(g.level, g.goal);
       let st, cls;
       if (g.done) { st = g.passed ? '✓ 통과' : '✓ 달성'; cls = 'td-st-done'; nDone++; }
       else if (it.today) { st = g.solved ? '아직' : '다른 레벨만'; cls = 'td-st-try'; nTry++; }
