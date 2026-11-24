@@ -251,3 +251,8 @@ body.num-wide .app-shell{max-width:64rem}
 .bb-try{color:var(--c-main-dark)}
 .bb-skip{color:#cbd5e1}
 .bb-now{box-shadow:inset 0 0 0 2px var(--c-main);border-radius:.4rem}
+/* 교사 '오늘' 탭 */
+.td-st{display:inline-block;padding:.15rem .55rem;border-radius:999px;font-size:.8rem;font-weight:800}
+.td-st-done{background:var(--c-ok-soft);color:var(--c-ok);border:1px solid var(--c-ok-line)}
+.td-st-try{background:var(--c-main-soft);color:var(--c-main-dark);border:1px solid var(--c-main-line)}
+.td-st-none{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}

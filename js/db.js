@@ -676,6 +676,25 @@ async function getComparison(code, date1Key, date2Key) {
   });
 }
 
+/** 교사 화면 '오늘' 탭 — 학생마다 오늘 목표(levels.js todayGoal = 학생 카드 = 학급 관리 사이트 '오늘 했다').
+ *  기준이 지난 기록까지 봐야 해서 반 전체 기록을 읽는다(loadAllResults, 10분 캐시). force 면 캐시를 비우고 다시 읽는다.
+ *  돌려주는 값: [{ no, goal: todayGoal 결과 | null(다 끝냄), today: 오늘 기록 수 }] — 이름은 넣지 않는다(번호만) */
+async function getToday(code, basicStart, force) {
+  if (force) delete cache['results:' + code];
+  const [rows, students] = await Promise.all([loadAllResults(code), getStudents(code)]);
+  const today = dateKey(new Date()), by = {};
+  rows.forEach(r => { const no = String(r.studentNo); (by[no] = by[no] || []).push(r); });
+  const nos = [...new Set([...students.map(s => String(s.number)), ...Object.keys(by)])].sort((a, b) => Number(a) - Number(b));
+  return nos.map(no => {
+    const mine = by[no] || [];
+    return {
+      no,
+      goal: Levels.todayGoal(mine, (basicStart || {})[no] || null, today, scoreOf),
+      today: mine.filter(r => (r.dateKey || dateKey(new Date(r.ts))) === today).length
+    };
+  });
+}
+
 async function getAccessAlerts(code) {
   const cutoff = Date.now() - 24 * 3600 * 1000;
   let logs;
@@ -762,6 +781,6 @@ return {
   getStudents, upsertStudent, deleteStudent, bulkImport,
   verifyStudentPin, logAccess,
   saveResult, saveDraft: draft.save, clearDraft: draft.clear, startBackgroundSync, flushOutbox,
-  getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getBasicProgress, getAccessAlerts, clearRecords
+  getBestScores, getProgress, scoreOf, getHistory, getRanking, getComparison, getToday, getBasicProgress, getAccessAlerts, clearRecords
 };
 })();
