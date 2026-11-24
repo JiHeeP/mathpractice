@@ -8,7 +8,8 @@ const state = {
   level: null, bestScores: {},
   basicStart: {},   // 번호별 기초 트랙 시작점 — 교사 화면 설정에서 정한다(반 문서 basicStart). 없으면 시작점 없음
   progress: { passed: {}, recent: {} },   // 통과한 레벨 · 레벨별 최근 문제 정오 (규칙은 levels.js)
-  loadFailed: false   // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
+  loadFailed: false,  // 기록 읽기 실패 — 0점으로 덮어쓰지 않고 경고를 띄운다
+  myRows: null        // 이 학생 기록 전부 — '오늘 목표' 계산용 (못 읽었으면 null)
 };
 
 const $ = id => document.getElementById(id);
@@ -80,7 +81,7 @@ const bestBackup = {
 /** 학생이 바뀌면 앞 학생의 점수를 지운다 — 같은 기기에서 읽기에 실패했을 때 앞 학생 점수가 보이지 않도록 */
 function resetStudent() {
   state.studentNo = null; state.studentName = '';
-  state.bestScores = {}; state.progress = { passed: {}, recent: {} }; state.loadFailed = false;
+  state.bestScores = {}; state.progress = { passed: {}, recent: {} }; state.loadFailed = false; state.myRows = null;
 }
 
 /* ═══ 부팅 ═══ */
@@ -244,12 +245,14 @@ function fetchBestScores() {
     .then(p => {
       state.bestScores = p.best || {};
       state.progress = { passed: p.passed || {}, recent: p.recent || {} };
+      state.myRows = p.rows || null;
       state.loadFailed = false;
       bestBackup.set({ best: state.bestScores, passed: state.progress.passed, recent: state.progress.recent });
     })
     .catch(err => {
       console.warn('기록 읽기 실패', err);
       state.loadFailed = true;
+      state.myRows = null; // 오늘 목표는 기록 전부가 있어야 셀 수 있어서, 못 읽으면 보여 주지 않는다
       if (Object.keys(state.bestScores).length) return;
       const b = bestBackup.get() || {};
       if (b.best && b.passed) {
@@ -290,6 +293,28 @@ function todayLevels() {
   return t ? [nextInCurrent(t)].filter(Boolean) : [];
 }
 
+/** 오늘 목표 한 줄 (선생님 결정 2026-11-24 — 카드의 숫자를 하나로).
+ *  기준은 levels.js todayGoal = 학급 관리 사이트의 '오늘 했다'. 시작 전 카드에는 점(지난 판)과 통과 기준을 두지 않는다
+ *  — 지난번 끝내지 못한 판의 점과 '0개 정답'이 함께 보여 헷갈렸다. 점과 통과 기준은 푸는 화면에 그대로 있다. */
+function goalHTML(next) {
+  if (!state.myRows) return '';
+  const g = L.todayGoal(state.myRows, myStart(), DB.dateKey(new Date()), DB.scoreOf);
+  if (!g) return '';
+  const lv = g.level !== next ? `<b>${g.level}</b> ` : '';
+  if (g.passed) return `<div class="goal goal-done">✓ 오늘 목표 달성! <b>${g.level}</b> 통과</div>`;
+  if (g.done) {
+    const how = g.first ? `${g.solved}문제 풀었어요` : `${g.prev}개 → ${g.best}개`;
+    return `<div class="goal goal-done">✓ 오늘 목표 달성! (${how})</div>
+      <div class="goal-sub">${lv}${g.size}문제 중 ${g.need}개 맞히면 통과예요. 더 해 봐요!</div>`;
+  }
+  if (g.first) {
+    return `<div class="goal">오늘 목표: ${lv}<b>${g.size}문제</b> 풀어 보기</div>
+      ${g.solved ? `<div class="goal-sub">오늘 ${g.solved}문제 풀었어요</div>` : ''}`;
+  }
+  return `<div class="goal">오늘 목표: ${lv}${g.size}문제 중 <b>${g.goal}개</b> 맞히기</div>
+    <div class="goal-sub">지난번 ${g.prev}개${g.solved ? ` · 오늘 최고 ${g.best}개` : ''}</div>`;
+}
+
 /** 오늘 할 것 화면 — 맨 위에 다음 도전 하나를 크게, 아래에 레벨 칩. 다 끝낸 묶음은 접어 둔다.
  *  잠긴 레벨도 누르면 카드에서 무엇을 먼저 통과해야 하는지 보여 준다. 잠금 계산은 levels.js 그대로.
  *  (자유 연습 버튼은 2026-11-17 선생님 결정으로 뺐다 — 학생 화면은 '도전' 하나. 예전 free 기록은 그대로 남고 읽힌다) */
@@ -313,8 +338,8 @@ function renderLevelButtons() {
   if (next) {
     const cfg = L.LEVEL_CONFIGS[next];
     card.innerHTML = `<span class="next-k">오늘 할 것</span>
+      ${goalHTML(next)}
       <button class="next-t" data-act="card"><b>${next}</b>${cfg.label}</button>
-      ${Session.windowHTML(next, state.progress.recent[next] || [], false)}
       <button class="big-btn big-go" data-act="go">🔥 도전 시작</button>
       ${second ? `<button class="next-sub" data-act="second">그다음 <b>${second}</b>${L.LEVEL_CONFIGS[second].label}</button>` : ''}`;
     card.querySelector('[data-act=card]').onclick = () => selectLevel(next);

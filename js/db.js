@@ -562,7 +562,7 @@ async function getProgress(code, studentNo) {
   const best = bestOf(rows);
   syncBest(code, studentNo, best, lastTsOf(rows));
   const p = Levels.computeProgress(rows, scoreOf);
-  return { best, passed: p.passed, recent: p.recent };
+  return { best, passed: p.passed, recent: p.recent, rows };
 }
 
 async function getHistory(code, studentNo) {

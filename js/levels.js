@@ -529,12 +529,73 @@ function nextInTrackFor(track, start, passed) {
   return TRACKS[track].levels.find(lv => !(passed && passed[lv]) && isLevelUnlocked(lv, passed)) || null;
 }
 
+/* ═══ 오늘 목표 (선생님 결정 2026-11-24) ═══
+ * 학급 관리 사이트(classcheckprogram mathpractice.js judgeHitDay)의 '오늘 했다'와 같은 기준이다.
+ *   - 오늘 할 레벨은 어제까지의 통과 기록으로 정한다(기초 먼저 → 지금 트랙의 열린 첫 레벨).
+ *   - 그 레벨을 오늘 통과하면 목표 달성.
+ *   - 아니면, 그날 그 레벨을 푼 문제(도전·중도 포기·일찍 통과, 시간 순서로 이어 붙임)의
+ *     연속 창(20 또는 10문제) 안에서 가장 많이 맞힌 개수가, 그 레벨을 마지막으로 푼 날보다 1개 이상 많으면 달성.
+ *   - 그 레벨을 처음 푸는 날이면 창 크기만큼(20 또는 10문제) 풀면 달성.
+ *   창 크기가 다른 날(문제 수를 줄이기 전 예전 긴 판을 푼 날)끼리는 비교하지 않는다.
+ *   어느 한쪽 규칙을 바꾸면 다른 쪽도 같이 바꿔야 한다.
+ */
+function bestWindowCount(seq, size) {
+  if (seq.length <= size) return windowCorrect([...seq].map(c => (c === '1' ? 1 : 0)));
+  let n = 0, best = 0;
+  for (let i = 0; i < seq.length; i++) {
+    n += seq[i] === '1' ? 1 : 0;
+    if (i >= size) n -= seq[i - size] === '1' ? 1 : 0;
+    if (i >= size - 1 && n > best) best = n;
+  }
+  return best;
+}
+/** 한 레벨의 날짜별 {c: 연속 창 최고 맞힌 개수, n: 푼 문제 수, s: 창 크기} */
+function hitsByDate(rows, level) {
+  const cfg = LEVEL_CONFIGS[level], seqs = {}, old = {};
+  (rows || []).filter(r => r && r.level === level && r.dateKey && (r.mode === 'challenge' || r.mode === 'aborted')
+    && typeof r.seq === 'string' && SEQ_RE.test(r.seq))
+    .sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : (a.ts || 0) - (b.ts || 0)))
+    .forEach(r => {
+      seqs[r.dateKey] = (seqs[r.dateKey] || '') + r.seq;
+      if ((isRunRule(level) || cfg.wasQ) && r.seq.length > cfg.chalQ) old[r.dateKey] = true;
+    });
+  const out = {};
+  Object.keys(seqs).forEach(d => {
+    const s = old[d] ? 20 : passWindow(level).size;
+    out[d] = { c: bestWindowCount(seqs[d], s), n: seqs[d].length, s };
+  });
+  return out;
+}
+/** 오늘 목표. rows = 이 학생 기록 전부, start = basicStart[번호], today = 'YYYY-MM-DD'
+ *  → null(모든 레벨 끝) | { level, size, need, done, passed, first, goal, best, solved, prev, prevDate } */
+function todayGoal(rows, start, today, scoreOf) {
+  const before = (rows || []).filter(r => r && r.dateKey && r.dateKey < today);
+  const passedBefore = computeProgress(before, scoreOf).passed;
+  const level = nextInTrackFor(currentTrack(start, passedBefore), start, passedBefore);
+  if (!level) return null;
+  const w = passWindow(level);
+  const g = { level, size: w.size, need: w.need, passed: false, done: false, first: false, goal: 0, best: 0, solved: 0, prev: null, prevDate: '' };
+  if (computeProgress(rows, scoreOf).passed[level]) { g.passed = g.done = true; return g; }
+  const hits = hitsByDate(rows, level), now = hits[today];
+  if (now) { g.best = now.c; g.solved = now.n; }
+  const prevDate = Object.keys(hits).filter(d => d < today && hits[d].s === w.size).sort().pop();
+  if (prevDate) {
+    g.prev = hits[prevDate].c; g.prevDate = prevDate;
+    g.goal = Math.min(g.prev + 1, w.size);
+    g.done = !!now && now.c > g.prev;
+  } else {
+    g.first = true; g.goal = w.size;
+    g.done = !!now && now.n >= w.size;
+  }
+  return g;
+}
+
 function getLevelLabel(lv) { return lv || '-'; }
 
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
   trackOf, prevInTrack, nextInTrack, currentTrack, nextInTrackFor, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
-  passWindow, windowCorrect, windowPassed, computeProgress,
+  passWindow, windowCorrect, windowPassed, computeProgress, todayGoal,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass
 };

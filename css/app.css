@@ -152,6 +152,11 @@
 .next-k{font-size:.8rem;font-weight:800;color:var(--c-main-dark)}
 .next-t{font-size:1.4rem;font-weight:900;color:#1e293b;line-height:1.3;word-break:keep-all;text-align:left}
 .next-t b{color:var(--c-main-dark);margin-right:.35rem}
+.goal{background:var(--c-main-soft);border:1px solid var(--c-main-line);border-radius:.9rem;padding:.6rem .8rem;font-size:1.05rem;font-weight:800;color:#1e293b;word-break:keep-all}
+.goal b{color:var(--c-main-dark);font-size:1.2rem}
+.goal-done{background:var(--c-ok-soft);border-color:var(--c-ok-line);color:var(--c-ok)}
+.goal-done b{color:var(--c-ok);font-size:1.05rem}
+.goal-sub{font-size:.85rem;font-weight:700;color:#475569;margin-top:-.3rem;padding-left:.2rem;word-break:keep-all}
 .lv-grp{display:flex;flex-direction:column;gap:.45rem}
 .lv-gh{display:flex;justify-content:space-between;font-size:.8rem;font-weight:800;color:#6b7280;padding:0 .15rem}
 .lv-chips{display:flex;flex-wrap:wrap;gap:.45rem}
