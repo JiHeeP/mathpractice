@@ -566,6 +566,14 @@ function hitsByDate(rows, level) {
   });
   return out;
 }
+/** 오늘 목표 문구 (선생님 결정 2026-11-25): '1판 n개 이상 정답'.
+ *  한 판 문제 수가 판정 창보다 적은 레벨(8문제 → 창 10, 15문제 → 창 20)은 한 판으로는 n개를 못 채워서 '이어 푼 10문제에서'로 쓴다.
+ *  bold 면 n개를 굵게 */
+function goalText(level, n, bold) {
+  const num = bold ? `<b>${n}개</b>` : `${n}개`;
+  const w = passWindow(level);
+  return LEVEL_CONFIGS[level].chalQ >= w.size ? `1판 ${num} 이상 정답` : `이어 푼 ${w.size}문제에서 ${num} 이상 정답`;
+}
 /** 오늘 목표. rows = 이 학생 기록 전부, start = basicStart[번호], today = 'YYYY-MM-DD'
  *  → null(모든 레벨 끝) | { level, size, need, done, passed, first, goal, best, solved, prev, prevDate } */
 function todayGoal(rows, start, today, scoreOf) {
@@ -595,7 +603,7 @@ function getLevelLabel(lv) { return lv || '-'; }
 window.Levels = {
   LEVEL_ORDER, BASIC_LINES, BASIC_ORDER, DMUL_ORDER, AREA_ORDER, TRACKS, TRACK_KEYS, ALL_LEVELS, SCRATCH_LEVELS,
   trackOf, prevInTrack, nextInTrack, currentTrack, nextInTrackFor, isRunRule, shownSize, failAt, parseBasicStart, formatBasicStart, basicSkipped, nextBasicLevel, LEVEL_MAX, LEVEL_CONFIGS, GROUP_LABELS, PRACTICE_MODES, allowedWrong, unlockThreshold,
-  passWindow, windowCorrect, windowPassed, computeProgress, todayGoal,
+  passWindow, windowCorrect, windowPassed, computeProgress, todayGoal, goalText,
   isLevelUnlocked, getPrevLevelInfo, calculateScore, buildScoreOutcome, getLevelLabel,
   applyBackfillPass
 };

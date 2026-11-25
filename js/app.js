@@ -303,15 +303,15 @@ function goalHTML(next) {
   const lv = g.level !== next ? `<b>${g.level}</b> ` : '';
   if (g.passed) return `<div class="goal goal-done">✓ 오늘 목표 달성! <b>${g.level}</b> 통과</div>`;
   if (g.done) {
-    const how = g.first ? `${g.solved}문제 풀었어요` : `${g.prev}개 → ${g.best}개`;
+    const how = g.first ? '1판 풀었어요' : `${g.prev}개 → ${g.best}개`;
     return `<div class="goal goal-done">✓ 오늘 목표 달성! (${how})</div>
-      <div class="goal-sub">${lv}${g.size}문제 중 ${g.need}개 맞히면 통과예요. 더 해 봐요!</div>`;
+      <div class="goal-sub">${lv}${L.goalText(g.level, g.need)}이면 통과예요. 더 해 봐요!</div>`;
   }
   if (g.first) {
-    return `<div class="goal">오늘 목표: ${lv}<b>${g.size}문제</b> 풀어 보기</div>
-      ${g.solved ? `<div class="goal-sub">오늘 ${g.solved}문제 풀었어요</div>` : ''}`;
+    return `<div class="goal">오늘 목표: ${lv}<b>${g.solved ? '1판 더 풀기' : '1판 풀기'}</b></div>
+      ${g.solved ? `<div class="goal-sub">판이 일찍 끝났어요. 오늘 ${g.solved}문제 풀었어요</div>` : ''}`;
   }
-  return `<div class="goal">오늘 목표: ${lv}${g.size}문제 중 <b>${g.goal}개</b> 맞히기</div>
+  return `<div class="goal">오늘 목표: ${lv}${L.goalText(g.level, g.goal, true)}</div>
     <div class="goal-sub">지난번 ${g.prev}개${g.solved ? ` · 오늘 최고 ${g.best}개` : ''}</div>`;
 }
 
